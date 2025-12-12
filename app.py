@@ -126,9 +126,9 @@ DEFAULT_NEGATIVE = """low quality, blurry, unnatural skin tone, bad lighting, pi
 noise, oversharpen, soft focus,pixelated"""
 
 ASPECTS = [
-    "1024x1024 (1:1)", "1152x896 (9:7)", "896x1152 (7:9)",
-    "1152x864 (4:3)", "864x1152 (3:4)", "1248x832 (3:2)",
-    "832x1248 (2:3)", "1280x720 (16:9)", "720x1280 (9:16)",
+    "864x1152 (3:4)", "720x1280 (9:16)", "1024x1024 (1:1)", "1152x896 (9:7)", "896x1152 (7:9)",
+    "1152x864 (4:3)", "1248x832 (3:2)",
+    "832x1248 (2:3)", "1280x720 (16:9)", 
     "1344x576 (21:9)", "576x1344 (9:21)"
 ]
 
@@ -145,7 +145,7 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
             positive = gr.Textbox(DEFAULT_POSITIVE, label="Positive Prompt", lines=5)
 
             with gr.Row():
-                aspect = gr.Dropdown(ASPECTS, value="1024x1024 (1:1)", label="Aspect Ratio")
+                aspect = gr.Dropdown(ASPECTS, value="864x1152 (3:4)", label="Aspect Ratio")
                 seed = gr.Number(value=0, label="Seed (0 = random)", precision=0)
                 steps = gr.Slider(4, 25, value=9, step=1, label="Steps")
             
@@ -157,7 +157,7 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
                     cfg = gr.Slider(0.5, 4.0, value=1.0, step=0.1, label="CFG")
                     denoise = gr.Slider(0.1, 1.0, value=1.0, step=0.05, label="Denoise")
                     # Batch Size 滑桿
-                    batch_size_input = gr.Slider(1, 4, value=1, step=1, label="Batch Size (Images per run)")
+                    batch_size_input = gr.Slider(1, 4, value=2, step=1, label="Batch Size")
                 with gr.Row():
                     negative = gr.Textbox(DEFAULT_NEGATIVE, label="Negative Prompt", lines=3)
         
@@ -186,3 +186,4 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
     )
 
 demo.launch(share=True, debug=True)
+
