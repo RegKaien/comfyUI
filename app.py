@@ -36,32 +36,30 @@ def get_save_path(prompt):
 def generate(input):
     values = input["input"]
     positive_prompt = values['positive_prompt']
-    negative_prompt = values['negative_prompt']
-    seed = values['seed'] # 0
-    steps = values['steps'] # 9
-    cfg = values['cfg'] # 1.0
-    sampler_name = values['sampler_name'] # euler
-    scheduler = values['scheduler'] # simple
-    denoise = values['denoise'] # 1.0
-    width = values['width'] # 1024
-    height = values['height'] # 1024
-    batch_size = values['batch_size'] # 1.0  ← 已使用 int(batch_size)
+    negative_prompt = values['negative_prompt'] # [cite: 1, 2]
+    seed = values['seed'] # 0 [cite: 2]
+    steps = values['steps'] # 9 [cite: 2]
+    cfg = values['cfg'] # 1.0 [cite: 2]
+    sampler_name = values['sampler_name'] # euler [cite: 2]
+    scheduler = values['scheduler'] # simple [cite: 2]
+    denoise = values['denoise'] # 1.0 [cite: 2]
+    width = values['width'] # 1024 [cite: 2]
+    height = values['height'] # 1024 [cite: 2]
+    batch_size = values['batch_size'] # 1.0 [cite: 2]
 
     if seed == 0:
         random.seed(int(time.time()))
         seed = random.randint(0, 18446744073709551615)
 
-    positive = CLIPTextEncode.encode(clip, positive_prompt)[0]
-    negative = CLIPTextEncode.encode(clip, negative_prompt)[0]
-    latent_image = EmptyLatentImage.generate(width, height, batch_size=batch_size)[0]  # ← 這裡使用 batch_size
-    samples = KSampler.sample(unet, seed, steps, cfg, sampler_name, scheduler, positive, negative, latent_image, denoise=denoise)[0]
-    decoded = VAEDecode.decode(vae, samples)[0].detach()
-    
-    # 如果 batch_size >1，修改這裡以保存多張圖像（範例：只保存第一張）
-    save_path = get_save_path(positive_prompt)
+    positive = CLIPTextEncode.encode(clip, positive_prompt)[0] # [cite: 3]
+    negative = CLIPTextEncode.encode(clip, negative_prompt)[0] # [cite: 3]
+    latent_image = EmptyLatentImage.generate(width, height, batch_size=batch_size)[0] # [cite: 3]
+    samples = KSampler.sample(unet, seed, steps, cfg, sampler_name, scheduler, positive, negative, latent_image, denoise=denoise)[0] # [cite: 3]
+    decoded = VAEDecode.decode(vae, samples)[0].detach() # [cite: 3]
+    save_path=get_save_path(positive_prompt)
     Image.fromarray(np.array(decoded*255, dtype=np.uint8)[0]).save(save_path)
-    return save_path, seed
-
+    return save_path,seed
+    
 import gradio as gr
 def generate_ui(
     positive_prompt,
@@ -71,9 +69,9 @@ def generate_ui(
     steps,
     cfg,
     denoise,
-    batch_size=1,  # ← 保持預設，但現在會從 UI 接收
-    sampler_name="euler",
-    scheduler="simple"
+    batch_size, # <--- 接收來自 Gradio 介面的 batch_size
+    sampler_name="euler", # [cite: 4]
+    scheduler="simple" # [cite: 4]
 ):
     width, height = [int(x) for x in aspect_ratio.split("(")[0].strip().split("x")]
 
@@ -83,23 +81,27 @@ def generate_ui(
             "negative_prompt": negative_prompt,
             "width": width,
             "height": height,
-            "batch_size": int(batch_size),  # ← 這裡轉換為 int
-            "seed": int(seed),
-            "steps": int(steps),
-            "cfg": float(cfg),
-            "sampler_name": sampler_name,
-            "scheduler": scheduler,
-            "denoise": float(denoise),
+            "batch_size": int(batch_size), # [cite: 5]
+            "seed": int(seed), # [cite: 5]
+            "steps": int(steps), # [cite: 5]
+            "cfg": float(cfg), # [cite: 5]
+            "sampler_name": sampler_name, # [cite: 5]
+            "scheduler": scheduler, # [cite: 5]
+            "denoise": float(denoise), # [cite: 5]
         }
     }
 
-    image_path, seed = generate(input_data)
-    return image_path, image_path, seed
+    image_path,seed = generate(input_data)
+    return image_path,image_path,seed
 
-DEFAULT_POSITIVE = """A beautiful woman with platinum blond hair that is almost white, snowy white skin, red bush, very big plump red lips, high cheek bones and sharp. She has almond shaped red eyes and she's holding a intricate mask. She's wearing white and gold royal gown with a black cloak.  In the veins of her neck its gold."""
+
+DEFAULT_POSITIVE = """A beautiful woman with platinum blond hair that is almost white, snowy white skin, red bush, very big plump red lips, high cheek bones and sharp. [cite: 6]
+She has almond shaped red eyes and she's holding a intricate mask. [cite: 7]
+She's wearing white and gold royal gown with a black cloak. [cite: 8]
+In the veins of her neck its gold.""" [cite: 9]
 
 DEFAULT_NEGATIVE = """low quality, blurry, unnatural skin tone, bad lighting, pixelated,
-noise, oversharpen, soft focus,pixelated"""
+noise, oversharpen, soft focus,pixelated""" [cite: 9]
 
 ASPECTS = [
     "1024x1024 (1:1)", "1152x896 (9:7)", "896x1152 (7:9)",
@@ -108,14 +110,20 @@ ASPECTS = [
     "1344x576 (21:9)", "576x1344 (9:21)"
 ]
 
-custom_css = ".gradio-container { font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif; }"
+
+custom_css = ".gradio-container { font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif; }" # [cite: 10]
 
 with gr.Blocks(theme=gr.themes.Soft(),css=custom_css) as demo:
   gr.HTML("""
-
-# Z-Image-Turbo
-
+<div style=\"width:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; margin:20px 0;\">
+    <h1 style=\"font-size:2.5em; margin-bottom:10px;\">Z-Image-Turbo</h1>
+    <a href=\"https://github.com/Tongyi-MAI/Z-Image\" target=\"_blank\">
+        <img src=\"https://img.shields.io/badge/GitHub-Z--Image-181717?logo=github&logoColor=white\"
+             style=\"height:15px;\">
+    </a>
+</div>
 """)
+
 
   with gr.Row():
     with gr.Column():
@@ -123,28 +131,30 @@ with gr.Blocks(theme=gr.themes.Soft(),css=custom_css) as demo:
 
       with gr.Row():
         aspect = gr.Dropdown(ASPECTS, value="1024x1024 (1:1)", label="Aspect Ratio")
-        seed = gr.Number(value=0, label="Seed (0 = random)", precision=0)
-        steps = gr.Slider(4, 25, value=9, step=1, label="Steps")
+        seed = gr.Number(value=0, label="Seed (0 = random)", precision=0) # [cite: 11]
+        steps = gr.Slider(4, 25, value=9, step=1, label="Steps") # [cite: 11]
       with gr.Row():
-        run = gr.Button('Generate', variant='primary')
+        run = gr.Button('🚀 Generate', variant='primary')
       with gr.Accordion('Image Settings', open=False):
         with gr.Row():
-          cfg = gr.Slider(0.5, 4.0, value=1.0, step=0.1, label="CFG")
-          denoise = gr.Slider(0.1, 1.0, value=1.0, step=0.05, label="Denoise")
-          # ← 新增：batch_size 滑桿
-          batch_size_input = gr.Slider(1, 4, value=1, step=1, label="Batch Size (Number of Images)")
+          # *** 新增 Batch Size 介面組件 ***
+          batch_size_ui = gr.Slider(1, 4, value=1, step=1, label="Batch Size (Images at once)") # <--- 新增
+          cfg = gr.Slider(0.5, 4.0, value=1.0, step=0.1, label="CFG") # [cite: 12]
+          
         with gr.Row():
-          negative = gr.Textbox(DEFAULT_NEGATIVE, label="Negative Prompt", lines=3)
+          denoise = gr.Slider(0.1, 1.0, value=1.0, step=0.05, label="Denoise")
+        with gr.Row():
+          negative = gr.Textbox(DEFAULT_NEGATIVE, label="Negative Prompt", lines=3) # [cite: 12]
     with gr.Column():
         download_image=gr.File(label="Download Image")
         output_img = gr.Image(label="Generated Image", height=480)
         used_seed = gr.Textbox(label="Seed Used", interactive=False,show_copy_button=True)
 
-    # ← 修正：加入 batch_size 到 inputs
+    # *** 更新 run.click 傳入參數 ***
     run.click(
         fn=generate_ui,
-        inputs=[positive, negative, aspect, seed, steps, cfg, denoise, batch_size_input],  # ← 新增 batch_size_input
-        outputs=[download_image, output_img, used_seed]
+        inputs=[positive, negative, aspect, seed, steps, cfg, denoise, batch_size_ui], # <--- 傳遞 batch_size_ui
+        outputs=[download_image,output_img, used_seed]
     )
 
 demo.launch(share=True, debug=True)
