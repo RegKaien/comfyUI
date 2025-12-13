@@ -20,11 +20,26 @@ KSampler = NODE_CLASS_MAPPINGS["KSampler"]()
 VAEDecode = NODE_CLASS_MAPPINGS["VAEDecode"]()
 EmptyLatentImage = NODE_CLASS_MAPPINGS["EmptyLatentImage"]()
 
+# --- [新增] Upscale 相關節點 ---
+UpscaleModelLoader = NODE_CLASS_MAPPINGS["UpscaleModelLoader"]()
+ImageUpscaleWithModel = NODE_CLASS_MAPPINGS["ImageUpscaleWithModel"]()
+
 # --- 模型預加載 ---
+print("Loading models...")
 with torch.inference_mode():
     unet = UNETLoader.load_unet("z-image-turbo-fp8-e4m3fn.safetensors", "fp8_e4m3fn_fast")[0]
     clip = CLIPLoader.load_clip("qwen_3_4b.safetensors", type="lumina2")[0]
     vae = VAELoader.load_vae("ae.safetensors")[0]
+    
+    # --- [新增] 加載 4x Upscale 模型 ---
+    # 請確保 '4x-UltraSharp.pth' 存在於 models/upscale_models/ 目錄下
+    # 如果使用不同的 Digital Art 模型 (如 4x_NMKD-Siax_200k.pth)，請修改此處檔名
+    try:
+        upscale_net = UpscaleModelLoader.load_model("4x-UltraSharp.pth")[0]
+        print("Upscale model loaded successfully.")
+    except Exception as e:
+        print(f"Warning: Upscale model not found or failed to load. Upscaling may fail if enabled. Error: {e}")
+        upscale_net = None
 
 save_dir="./results"
 os.makedirs(save_dir, exist_ok=True)
@@ -52,7 +67,8 @@ def generate(input):
     denoise = values['denoise']
     width = values['width']
     height = values['height']
-    batch_size = values['batch_size'] # 從 UI 接收的整數
+    batch_size = values['batch_size']
+    use_upscale = values['use_upscale'] # [新增] 接收 upscale 參數
 
     if seed == 0:
         random.seed(int(time.time()))
@@ -61,24 +77,36 @@ def generate(input):
     positive = CLIPTextEncode.encode(clip, positive_prompt)[0]
     negative = CLIPTextEncode.encode(clip, negative_prompt)[0]
     
-    # 在這裡生成 latent 時，使用 batch_size
+    # 生成 Latent
     latent_image = EmptyLatentImage.generate(width, height, batch_size=batch_size)[0]
     
+    # 採樣 (Sampling)
     samples = KSampler.sample(unet, seed, steps, cfg, sampler_name, scheduler, positive, negative, latent_image, denoise=denoise)[0]
-    decoded = VAEDecode.decode(vae, samples)[0].detach()
     
-    # --- 修改點：保存多張圖片 ---
+    # VAE 解碼 (Latent -> Pixel)
+    decoded = VAEDecode.decode(vae, samples)[0]
+    
+    # --- [新增] 執行 Upscale 邏輯 ---
+    if use_upscale and upscale_net is not None:
+        print("Upscaling images...")
+        # ImageUpscaleWithModel 接收 (upscale_model, image)
+        decoded = ImageUpscaleWithModel.upscale(upscale_net, decoded)[0]
+    elif use_upscale and upscale_net is None:
+        print("Upscale requested but model not loaded. Skipping.")
+
+    # 轉為可保存的格式
+    decoded = decoded.detach()
+    
+    # 保存圖片
     saved_paths = []
     # 將 Tensor 轉為 Numpy 陣列: (Batch_Size, Height, Width, Channels)
     images_np = np.array(decoded * 255, dtype=np.uint8)
     
-    # 遍歷每一張圖片進行存檔
     for img_np in images_np:
         save_path = get_save_path(positive_prompt)
         Image.fromarray(img_np).save(save_path)
         saved_paths.append(save_path)
         
-    # 回傳路徑列表 (List) 而非單一字串
     return saved_paths, seed
 
 # --- UI 邏輯中介 ---
@@ -90,7 +118,8 @@ def generate_ui(
     steps,
     cfg,
     denoise,
-    batch_size, # 接收 batch_size
+    batch_size,
+    use_upscale, # [新增] 接收 UI 參數
     sampler_name="euler",
     scheduler="simple"
 ):
@@ -102,21 +131,19 @@ def generate_ui(
             "negative_prompt": negative_prompt,
             "width": width,
             "height": height,
-            "batch_size": int(batch_size), # 確保轉為 int
+            "batch_size": int(batch_size),
             "seed": int(seed),
             "steps": int(steps),
             "cfg": float(cfg),
             "sampler_name": sampler_name,
             "scheduler": scheduler,
             "denoise": float(denoise),
+            "use_upscale": use_upscale, # [新增] 傳遞參數
         }
     }
 
-    # 這裡接收的是路徑列表
     image_paths, seed = generate(input_data)
     
-    # image_paths 傳給 File 會變成 Zip 下載
-    # image_paths 傳給 Gallery 會顯示圖片牆
     return image_paths, image_paths, seed
 
 # --- Gradio 介面定義 ---
@@ -136,7 +163,7 @@ custom_css = ".gradio-container { font-family: 'SF Pro Display', -apple-system, 
 
 with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
     gr.HTML("""
-    # Z-Image-Turbo
+    # Z-Image-Turbo (with 4x Upscale)
     """)
 
     with gr.Row():
@@ -156,8 +183,12 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
                 with gr.Row():
                     cfg = gr.Slider(0.5, 4.0, value=1.0, step=0.1, label="CFG")
                     denoise = gr.Slider(0.1, 1.0, value=1.0, step=0.05, label="Denoise")
-                    # Batch Size 滑桿
                     batch_size_input = gr.Slider(1, 6, value=2, step=1, label="Batch Size")
+                
+                # [新增] Upscale Checkbox
+                with gr.Row():
+                    use_upscale = gr.Checkbox(label="Enable 4x Upscale (Digital Art Sharp)", value=False, info="Increases generation time significantly.")
+                
                 with gr.Row():
                     negative = gr.Textbox(DEFAULT_NEGATIVE, label="Negative Prompt", lines=3)
         
@@ -165,7 +196,6 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
         with gr.Column():
             download_image = gr.File(label="Download Image(s)")
             
-            # --- 修改點：使用 Gallery 顯示多圖 ---
             output_img = gr.Gallery(
                 label="Generated Images", 
                 show_label=True, 
@@ -181,10 +211,9 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
     # 事件綁定
     run.click(
         fn=generate_ui,
-        inputs=[positive, negative, aspect, seed, steps, cfg, denoise, batch_size_input], # 加入 batch_size_input
+        # [新增] 將 use_upscale 放入 inputs
+        inputs=[positive, negative, aspect, seed, steps, cfg, denoise, batch_size_input, use_upscale], 
         outputs=[download_image, output_img, used_seed]
     )
 
 demo.launch(share=True, debug=True)
-
-
