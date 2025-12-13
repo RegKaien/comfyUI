@@ -1,14 +1,13 @@
 #@title Utils Code
 # %cd /content/ComfyUI
 
-import os, random, time
+import os, random, time, sys
 import torch
 import numpy as np
 from PIL import Image
 import re, uuid
 from nodes import NODE_CLASS_MAPPINGS
 import gradio as gr
-import sys
 
 # --- ComfyUI 核心節點加載 ---
 UNETLoader = NODE_CLASS_MAPPINGS["UNETLoader"]()
@@ -19,45 +18,45 @@ KSampler = NODE_CLASS_MAPPINGS["KSampler"]()
 VAEDecode = NODE_CLASS_MAPPINGS["VAEDecode"]()
 EmptyLatentImage = NODE_CLASS_MAPPINGS["EmptyLatentImage"]()
 
-# --- [修正] Upscale 節點加載邏輯 ---
-# 這些節點通常在庫存的 comfy_extras 中，不在主 mappings 裡
+# --- [新增] Upscale 節點與模型掃描邏輯 ---
 upscale_available = False
+UpscaleLoaderNode = None
+ImageUpscaleNode = None
+
 try:
+    # Upscale 節點通常位於 comfy_extras
     from comfy_extras.nodes_upscale_model import UpscaleModelLoader, ImageUpscaleWithModel
-    # 實例化節點類別
     UpscaleLoaderNode = UpscaleModelLoader()
     ImageUpscaleNode = ImageUpscaleWithModel()
     upscale_available = True
     print("Upscale nodes imported successfully.")
 except ImportError:
     print("Warning: Could not import Upscale nodes from comfy_extras. Upscaling will be disabled.")
-    UpscaleLoaderNode = None
-    ImageUpscaleNode = None
 
-# --- 模型預加載 ---
-print("Loading models...")
+def get_available_upscalers():
+    """掃描 models/upscale_models 資料夾下的模型檔案"""
+    path = os.path.join("models", "upscale_models")
+    if not os.path.exists(path):
+        os.makedirs(path, exist_ok=True)
+        return ["None"]
+    
+    # 支援的副檔名
+    valid_extensions = {'.pth', '.pt', '.safetensors', '.bin'}
+    files = [f for f in os.listdir(path) if os.path.splitext(f)[1] in valid_extensions]
+    
+    # 將 'None' 放在第一個選項
+    return ["None"] + sorted(files)
+
+# 取得目前可用的模型列表
+upscaler_list = get_available_upscalers()
+print(f"Found upscalers: {upscaler_list}")
+
+# --- 基礎模型預加載 ---
+print("Loading base models...")
 with torch.inference_mode():
     unet = UNETLoader.load_unet("z-image-turbo-fp8-e4m3fn.safetensors", "fp8_e4m3fn_fast")[0]
     clip = CLIPLoader.load_clip("qwen_3_4b.safetensors", type="lumina2")[0]
     vae = VAELoader.load_vae("ae.safetensors")[0]
-    
-    # --- 加載 4x Upscale 模型 ---
-    upscale_net = None
-    if upscale_available:
-        # 設定目標模型名稱 (Digital Art Sharp 常用 4x-UltraSharp)
-        # 請確認 models/upscale_models/ 中有此檔案，若無可改為其他可用模型
-        target_upscale_model = "4x-UltraSharp.pth" 
-        
-        # 檢查檔案是否存在，避免報錯
-        model_path = os.path.join("models", "upscale_models", target_upscale_model)
-        if os.path.exists(model_path):
-            try:
-                upscale_net = UpscaleLoaderNode.load_model(target_upscale_model)[0]
-                print(f"Upscale model '{target_upscale_model}' loaded.")
-            except Exception as e:
-                print(f"Failed to load upscale model: {e}")
-        else:
-            print(f"Upscale model file '{target_upscale_model}' not found in models/upscale_models/. Upscaling will be skipped.")
 
 save_dir="./results"
 os.makedirs(save_dir, exist_ok=True)
@@ -85,7 +84,7 @@ def generate(input):
     width = values['width']
     height = values['height']
     batch_size = values['batch_size']
-    use_upscale = values.get('use_upscale', False)
+    upscale_model_name = values.get('upscale_model_name', "None") # 接收模型名稱
 
     if seed == 0:
         random.seed(int(time.time()))
@@ -94,22 +93,31 @@ def generate(input):
     positive = CLIPTextEncode.encode(clip, positive_prompt)[0]
     negative = CLIPTextEncode.encode(clip, negative_prompt)[0]
     
+    # 1. 生成 Latent
     latent_image = EmptyLatentImage.generate(width, height, batch_size=batch_size)[0]
     
+    # 2. 採樣 (KSampler)
     samples = KSampler.sample(unet, seed, steps, cfg, sampler_name, scheduler, positive, negative, latent_image, denoise=denoise)[0]
+    
+    # 3. VAE 解碼
     decoded = VAEDecode.decode(vae, samples)[0]
     
-    # --- 執行 Upscale 邏輯 ---
-    if use_upscale and upscale_net is not None and upscale_available:
-        print("Upscaling images...")
+    # --- 4. 執行 Upscale (如果使用者選的不是 None) ---
+    if upscale_model_name != "None" and upscale_available:
+        print(f"Upscaling with model: {upscale_model_name}...")
         try:
-            # 進行放大
-            decoded = ImageUpscaleNode.upscale(upscale_net, decoded)[0]
+            # 動態加載選定的 Upscale 模型
+            # 注意: load_model 通常會回傳 (model, ) tuple
+            current_upscale_model = UpscaleLoaderNode.load_model(upscale_model_name)[0]
+            
+            # 執行放大
+            decoded = ImageUpscaleNode.upscale(current_upscale_model, decoded)[0]
+            print("Upscale finished.")
         except Exception as e:
-            print(f"Upscale failed during generation: {e}")
-    elif use_upscale:
-        print("Upscale requested but model not loaded. Skipping.")
+            print(f"Error during upscaling: {e}")
+            print("Returning original size image.")
 
+    # 轉為可保存的格式
     decoded = decoded.detach()
     
     saved_paths = []
@@ -132,7 +140,7 @@ def generate_ui(
     cfg,
     denoise,
     batch_size,
-    use_upscale,
+    upscale_model_name, # 接收下拉選單的值
     sampler_name="euler",
     scheduler="simple"
 ):
@@ -151,7 +159,7 @@ def generate_ui(
             "sampler_name": sampler_name,
             "scheduler": scheduler,
             "denoise": float(denoise),
-            "use_upscale": use_upscale,
+            "upscale_model_name": upscale_model_name, # 傳遞模型名稱
         }
     }
 
@@ -175,10 +183,11 @@ custom_css = ".gradio-container { font-family: 'SF Pro Display', -apple-system, 
 
 with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
     gr.HTML("""
-    # Z-Image-Turbo (with 4x Upscale)
+    # Z-Image-Turbo (with Upscaler)
     """)
 
     with gr.Row():
+        # 左側控制欄
         with gr.Column():
             positive = gr.Textbox(DEFAULT_POSITIVE, label="Positive Prompt", lines=5)
 
@@ -197,16 +206,18 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
                     batch_size_input = gr.Slider(1, 6, value=2, step=1, label="Batch Size")
                 
                 with gr.Row():
-                    # Upscale 開關
-                    use_upscale = gr.Checkbox(
-                        label="Enable 4x Upscale (Digital Art Sharp)", 
-                        value=False, 
-                        info="Requires '4x-UltraSharp.pth' in models/upscale_models/"
+                    # [修改] 使用下拉選單顯示 Upscaler
+                    upscale_dropdown = gr.Dropdown(
+                        choices=upscaler_list,
+                        value="None",
+                        label="Upscale Model",
+                        info="Files detected in models/upscale_models/"
                     )
                 
                 with gr.Row():
                     negative = gr.Textbox(DEFAULT_NEGATIVE, label="Negative Prompt", lines=3)
         
+        # 右側顯示欄
         with gr.Column():
             download_image = gr.File(label="Download Image(s)")
             
@@ -222,9 +233,11 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
             
             used_seed = gr.Textbox(label="Seed Used", interactive=False, show_copy_button=True)
 
+    # 事件綁定
     run.click(
         fn=generate_ui,
-        inputs=[positive, negative, aspect, seed, steps, cfg, denoise, batch_size_input, use_upscale], 
+        # 記得加入 upscale_dropdown 到輸入列表
+        inputs=[positive, negative, aspect, seed, steps, cfg, denoise, batch_size_input, upscale_dropdown], 
         outputs=[download_image, output_img, used_seed]
     )
 
