@@ -157,7 +157,7 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
                     cfg = gr.Slider(0.5, 4.0, value=1.0, step=0.1, label="CFG")
                     denoise = gr.Slider(0.1, 1.0, value=1.0, step=0.05, label="Denoise")
                     # Batch Size 滑桿
-                    batch_size_input = gr.Slider(1, 4, value=2, step=1, label="Batch Size")
+                    batch_size_input = gr.Slider(1, 6, value=2, step=1, label="Batch Size")
                 with gr.Row():
                     negative = gr.Textbox(DEFAULT_NEGATIVE, label="Negative Prompt", lines=3)
         
@@ -186,4 +186,5 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
     )
 
 demo.launch(share=True, debug=True)
+
 
