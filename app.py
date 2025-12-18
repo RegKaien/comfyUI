@@ -11,6 +11,7 @@ import gradio as gr
 import traceback
 
 # --- ComfyUI 核心節點加載 ---
+# 確保這些節點名稱與您的 ComfyUI 版本匹配
 UNETLoader = NODE_CLASS_MAPPINGS["UNETLoader"]()
 CLIPLoader = NODE_CLASS_MAPPINGS["CLIPLoader"]()
 VAELoader = NODE_CLASS_MAPPINGS["VAELoader"]()
@@ -154,7 +155,7 @@ def generate(input):
                 cfg=cfg,
                 sampler_name=sampler_name,
                 scheduler=scheduler,
-                denoise=usdu_denoise,   # 重繪降噪強度 (重要)
+                denoise=usdu_denoise,   # 重繪降噪強度
                 upscale_model=current_upscale_model,
                 mode_type=usdu_mode_type,
                 tile_width=usdu_tile_width,
@@ -226,4 +227,80 @@ def generate_ui(
             "usdu_tile_width": int(usdu_tile_width),
             "usdu_tile_height": int(usdu_tile_height),
             "usdu_mask_blur": int(usdu_mask_blur),
-            "
+            "usdu_tile_padding": int(usdu_tile_padding),
+            "usdu_seam_fix_mode": usdu_seam_fix_mode,
+            "usdu_seam_fix_denoise": float(usdu_seam_fix_denoise),
+            "usdu_seam_fix_width": int(usdu_seam_fix_width),
+            "usdu_seam_fix_mask_blur": int(usdu_seam_fix_mask_blur),
+            "usdu_seam_fix_padding": int(usdu_seam_fix_padding),
+            "usdu_force_uniform_tiles": usdu_force_uniform_tiles,
+            "usdu_tiled_decode": usdu_tiled_decode,
+        }
+    }
+
+    image_paths, seed = generate(input_data)
+    return image_paths, image_paths, seed
+
+# --- Gradio 介面定義 ---
+DEFAULT_POSITIVE = """A beautiful woman with platinum blond hair that is almost white, snowy white skin, red blush, very big plump red lips, high cheek bones and sharp features. She has almond shaped red eyes and she's holding a intricate mask.
+She's wearing white and gold royal gown with a black cloak.
+In the veins of her neck its gold."""
+
+DEFAULT_NEGATIVE = """low quality, blurry, unnatural skin tone, bad lighting, pixelated,
+noise, oversharpen, soft focus, pixelated"""
+
+ASPECTS = [
+    "864x1152 (3:4)", "720x1280 (9:16)", "1024x1024 (1:1)", "1152x896 (9:7)", "896x1152 (7:9)",
+    "1152x864 (4:3)", "1248x832 (3:2)",
+    "832x1248 (2:3)", "1280x720 (16:9)", 
+    "1344x576 (21:9)", "576x1344 (9:21)"
+]
+
+custom_css = ".gradio-container { font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif; }"
+
+with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
+    gr.HTML("""
+    # Z-Image-Turbo (with Ultimate SD Upscale)
+    """)
+
+    with gr.Row():
+        # 左側控制欄
+        with gr.Column():
+            positive = gr.Textbox(DEFAULT_POSITIVE, label="Positive Prompt", lines=5)
+
+            # 第一列：尺寸、種子、步數
+            with gr.Row():
+                aspect = gr.Dropdown(ASPECTS, value="864x1152 (3:4)", label="Aspect Ratio")
+                seed = gr.Number(value=0, label="Seed (0 = random)", precision=0)
+                steps = gr.Slider(4, 50, value=9, step=1, label="Steps")
+            
+            # 第二列：Batch Size 與 Upscale Model
+            with gr.Row():
+                batch_size_input = gr.Slider(1, 6, value=1, step=1, label="Batch Size")
+                upscale_dropdown = gr.Dropdown(
+                    choices=upscaler_list,
+                    value="None",
+                    label="Upscale Model",
+                    info="Select a model to enable upscaling options below"
+                )
+            
+            # 第三列：文生圖基礎設定
+            with gr.Accordion('Base Image Settings', open=True):
+                with gr.Row():
+                    cfg = gr.Slider(0.5, 8.0, value=1.0, step=0.1, label="CFG")
+                    denoise = gr.Slider(0.0, 1.0, value=1.0, step=0.05, label="Initial Generation Denoise (1.0 for new)")
+
+            # 第四列：Ultimate SD Upscale 進階設定
+            with gr.Accordion('Ultimate SD Upscale Settings', open=False):
+                with gr.Row():
+                    usdu_upscale_by = gr.Slider(1.0, 4.0, value=2.0, step=0.1, label="Upscale By")
+                    usdu_denoise = gr.Slider(0.05, 1.0, value=0.35, step=0.01, label="Upscale Denoise (Lower is safer)")
+                
+                with gr.Row():
+                    usdu_mode_type = gr.Dropdown(choices=["Linear", "Chess", "None"], value="Linear", label="Mode Type")
+                    usdu_tile_width = gr.Slider(64, 2048, value=512, step=64, label="Tile Width")
+                    usdu_tile_height = gr.Slider(64, 2048, value=512, step=64, label="Tile Height")
+
+                with gr.Row():
+                    usdu_mask_blur = gr.Slider(0, 64, value=8, step=1, label="Mask Blur")
+                    usdu_tile_padding = gr.Slider(0, 512, value=32, step=8,
