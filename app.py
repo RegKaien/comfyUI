@@ -143,6 +143,7 @@ def generate(input):
             current_upscale_model = UpscaleLoaderNode.load_model(upscale_model_name)[0]
             
             # 調用 UltimateSDUpscale
+            # 確保傳入 upscale_model=current_upscale_model
             decoded = UltimateSDUpscaleNode.upscale(
                 image=decoded,
                 model=unet,
@@ -156,7 +157,7 @@ def generate(input):
                 sampler_name=sampler_name,
                 scheduler=scheduler,
                 denoise=usdu_denoise,   # 重繪降噪強度
-                upscale_model=current_upscale_model,
+                upscale_model=current_upscale_model, # [關鍵修改] 傳遞模型
                 mode_type=usdu_mode_type,
                 tile_width=usdu_tile_width,
                 tile_height=usdu_tile_height,
@@ -276,6 +277,10 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
                 seed = gr.Number(value=0, label="Seed (0 = random)", precision=0)
                 steps = gr.Slider(4, 50, value=9, step=1, label="Steps")
             
+            # [修改] 將 Generate 按鈕移至此處 (Aspect Ratio 下方)
+            with gr.Row():
+                run = gr.Button('Generate', variant='primary')
+
             # 第二列：Batch Size 與 Upscale Model
             with gr.Row():
                 batch_size_input = gr.Slider(1, 6, value=1, step=1, label="Batch Size")
@@ -323,10 +328,6 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
             with gr.Row():
                 negative = gr.Textbox(DEFAULT_NEGATIVE, label="Negative Prompt", lines=3)
             
-            # Generate 按鈕
-            with gr.Row():
-                run = gr.Button('Generate', variant='primary')
-
         # 右側顯示欄
         with gr.Column():
             download_image = gr.File(label="Download Image(s)")
