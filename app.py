@@ -181,6 +181,9 @@ ASPECTS = [
 
 custom_css = ".gradio-container { font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif; }"
 
+# --- Gradio 介面定義 ---
+# ... (保留原本的 DEFAULT_POSITIVE, DEFAULT_NEGATIVE, ASPECTS, custom_css 定義) ...
+
 with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
     gr.HTML("""
     # Z-Image-Turbo (with Upscaler)
@@ -191,28 +194,34 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
         with gr.Column():
             positive = gr.Textbox(DEFAULT_POSITIVE, label="Positive Prompt", lines=5)
 
+            # 第一列：尺寸、種子、步數
             with gr.Row():
                 aspect = gr.Dropdown(ASPECTS, value="864x1152 (3:4)", label="Aspect Ratio")
                 seed = gr.Number(value=0, label="Seed (0 = random)", precision=0)
                 steps = gr.Slider(4, 25, value=9, step=1, label="Steps")
             
+            # [修改] 第二列：將 Batch Size 與 Upscale Model 移至此處 (Generate 上方)
+            with gr.Row():
+                batch_size_input = gr.Slider(1, 6, value=2, step=1, label="Batch Size")
+                upscale_dropdown = gr.Dropdown(
+                    choices=upscaler_list,
+                    value="None",
+                    label="Upscale Model",
+                    info="Files detected in models/upscale_models/"
+                )
+
+            # Generate 按鈕
             with gr.Row():
                 run = gr.Button('Generate', variant='primary')
             
+            # 進階設定 (移除已搬走的選項)
             with gr.Accordion('Image Settings', open=False):
                 with gr.Row():
                     cfg = gr.Slider(0.5, 4.0, value=1.0, step=0.1, label="CFG")
                     denoise = gr.Slider(0.1, 1.0, value=1.0, step=0.05, label="Denoise")
-                    batch_size_input = gr.Slider(1, 6, value=2, step=1, label="Batch Size")
+                    # Batch Size 已移出
                 
-                with gr.Row():
-                    # [修改] 使用下拉選單顯示 Upscaler
-                    upscale_dropdown = gr.Dropdown(
-                        choices=upscaler_list,
-                        value="None",
-                        label="Upscale Model",
-                        info="Files detected in models/upscale_models/"
-                    )
+                # Upscale Model 下拉選單已移出
                 
                 with gr.Row():
                     negative = gr.Textbox(DEFAULT_NEGATIVE, label="Negative Prompt", lines=3)
@@ -236,7 +245,7 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
     # 事件綁定
     run.click(
         fn=generate_ui,
-        # 記得加入 upscale_dropdown 到輸入列表
+        # inputs 列表順序必須與 generate_ui 函式參數對應
         inputs=[positive, negative, aspect, seed, steps, cfg, denoise, batch_size_input, upscale_dropdown], 
         outputs=[download_image, output_img, used_seed]
     )
