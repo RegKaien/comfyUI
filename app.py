@@ -224,4 +224,6 @@ def generate_ui(
             "usdu_denoise": float(usdu_denoise),
             "usdu_mode_type": usdu_mode_type,
             "usdu_tile_width": int(usdu_tile_width),
-            "usdu_tile_height":
+            "usdu_tile_height": int(usdu_tile_height),
+            "usdu_mask_blur": int(usdu_mask_blur),
+            "
