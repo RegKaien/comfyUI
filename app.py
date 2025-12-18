@@ -256,7 +256,9 @@ ASPECTS = [
     "1344x576 (21:9)", "576x1344 (9:21)"
 ]
 
-custom_css = ".gradio-container { font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif; }"
+custom_css = """
+.gradio-container { font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif; }
+"""
 
 with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
     gr.HTML("""
