@@ -19,7 +19,7 @@ KSampler = NODE_CLASS_MAPPINGS["KSampler"]()
 VAEDecode = NODE_CLASS_MAPPINGS["VAEDecode"]()
 EmptyLatentImage = NODE_CLASS_MAPPINGS["EmptyLatentImage"]()
 
-# --- [修改] Upscale 節點與模型掃描邏輯 ---
+# --- Upscale 節點與模型掃描邏輯 ---
 upscale_available = False
 UpscaleLoaderNode = None
 UltimateSDUpscaleNode = None
@@ -96,7 +96,23 @@ def generate(input):
     width = values['width']
     height = values['height']
     batch_size = values['batch_size']
-    upscale_model_name = values.get('upscale_model_name', "None") # 接收模型名稱
+    upscale_model_name = values.get('upscale_model_name', "None")
+    
+    # USDU Parameters
+    usdu_upscale_by = values.get('usdu_upscale_by', 2.0)
+    usdu_denoise = values.get('usdu_denoise', 0.35)
+    usdu_mode_type = values.get('usdu_mode_type', "Linear")
+    usdu_tile_width = values.get('usdu_tile_width', 512)
+    usdu_tile_height = values.get('usdu_tile_height', 512)
+    usdu_mask_blur = values.get('usdu_mask_blur', 8)
+    usdu_tile_padding = values.get('usdu_tile_padding', 32)
+    usdu_seam_fix_mode = values.get('usdu_seam_fix_mode', "None")
+    usdu_seam_fix_denoise = values.get('usdu_seam_fix_denoise', 1.0)
+    usdu_seam_fix_mask_blur = values.get('usdu_seam_fix_mask_blur', 8)
+    usdu_seam_fix_width = values.get('usdu_seam_fix_width', 64)
+    usdu_seam_fix_padding = values.get('usdu_seam_fix_padding', 16)
+    usdu_force_uniform_tiles = values.get('usdu_force_uniform_tiles', True)
+    usdu_tiled_decode = values.get('usdu_tiled_decode', False)
 
     if seed == 0:
         random.seed(int(time.time()))
@@ -125,13 +141,7 @@ def generate(input):
             # 動態加載選定的 Upscale 模型
             current_upscale_model = UpscaleLoaderNode.load_model(upscale_model_name)[0]
             
-            # 設定 UltimateSDUpscale 參數
-            # 這裡使用固定參數以簡化 UI，您也可以將其改為從 UI 傳入
-            usdu_upscale_by = 2.0       # 放大倍率
-            usdu_denoise = 0.35         # 重繪幅度 (重要：不要設為 1.0)
-            
             # 調用 UltimateSDUpscale
-            # 注意：這裡需要傳入原始的 model, positive, negative, vae 供重繪使用
             decoded = UltimateSDUpscaleNode.upscale(
                 image=decoded,
                 model=unet,
@@ -140,24 +150,24 @@ def generate(input):
                 vae=vae,
                 upscale_by=usdu_upscale_by,
                 seed=seed,
-                steps=steps,            # 重繪步數
+                steps=steps,            # 重繪步數，這裡沿用主生成的步數
                 cfg=cfg,
                 sampler_name=sampler_name,
                 scheduler=scheduler,
-                denoise=usdu_denoise,   # 重繪降噪強度
+                denoise=usdu_denoise,   # 重繪降噪強度 (重要)
                 upscale_model=current_upscale_model,
-                mode_type="Linear",     # 模式: Linear, Chess, None
-                tile_width=512,
-                tile_height=512,
-                mask_blur=8,
-                tile_padding=32,
-                seam_fix_mode="None",
-                seam_fix_denoise=1.0,
-                seam_fix_mask_blur=8,
-                seam_fix_width=64,
-                seam_fix_padding=16,
-                force_uniform_tiles=True,
-                tiled_decode=False
+                mode_type=usdu_mode_type,
+                tile_width=usdu_tile_width,
+                tile_height=usdu_tile_height,
+                mask_blur=usdu_mask_blur,
+                tile_padding=usdu_tile_padding,
+                seam_fix_mode=usdu_seam_fix_mode,
+                seam_fix_denoise=usdu_seam_fix_denoise,
+                seam_fix_mask_blur=usdu_seam_fix_mask_blur,
+                seam_fix_width=usdu_seam_fix_width,
+                seam_fix_padding=usdu_seam_fix_padding,
+                force_uniform_tiles=usdu_force_uniform_tiles,
+                tiled_decode=usdu_tiled_decode
             )[0]
             
             print("Ultimate Upscale finished.")
@@ -182,19 +192,16 @@ def generate(input):
 
 # --- UI 邏輯中介 ---
 def generate_ui(
-    positive_prompt,
-    negative_prompt,
-    aspect_ratio,
-    seed,
-    steps,
-    cfg,
-    denoise,
-    batch_size,
-    upscale_model_name, # 接收下拉選單的值
-    sampler_name="euler",
-    scheduler="simple"
+    positive_prompt, negative_prompt, aspect_ratio, seed, steps, cfg, denoise, batch_size, 
+    upscale_model_name,
+    # USDU Params
+    usdu_upscale_by, usdu_denoise, usdu_mode_type, usdu_tile_width, usdu_tile_height,
+    usdu_mask_blur, usdu_tile_padding, usdu_seam_fix_mode, usdu_seam_fix_denoise,
+    usdu_seam_fix_width, usdu_seam_fix_mask_blur, usdu_seam_fix_padding,
+    usdu_force_uniform_tiles, usdu_tiled_decode,
+    sampler_name="euler", scheduler="simple"
 ):
-    # 解析長寬比字串，例如 "864x1152 (3:4)"
+    # 解析長寬比字串
     width, height = [int(x) for x in aspect_ratio.split("(")[0].strip().split("x")]
 
     input_data = {
@@ -210,92 +217,11 @@ def generate_ui(
             "sampler_name": sampler_name,
             "scheduler": scheduler,
             "denoise": float(denoise),
-            "upscale_model_name": upscale_model_name, # 傳遞模型名稱
-        }
-    }
-
-    image_paths, seed = generate(input_data)
-    return image_paths, image_paths, seed
-
-# --- Gradio 介面定義 ---
-DEFAULT_POSITIVE = """A beautiful woman with platinum blond hair that is almost white, snowy white skin, red blush, very big plump red lips, high cheek bones and sharp features. She has almond shaped red eyes and she's holding a intricate mask.
-She's wearing white and gold royal gown with a black cloak.
-In the veins of her neck its gold."""
-
-DEFAULT_NEGATIVE = """low quality, blurry, unnatural skin tone, bad lighting, pixelated,
-noise, oversharpen, soft focus, pixelated"""
-
-ASPECTS = [
-    "864x1152 (3:4)", "720x1280 (9:16)", "1024x1024 (1:1)", "1152x896 (9:7)", "896x1152 (7:9)",
-    "1152x864 (4:3)", "1248x832 (3:2)",
-    "832x1248 (2:3)", "1280x720 (16:9)", 
-    "1344x576 (21:9)", "576x1344 (9:21)"
-]
-
-custom_css = """
-.gradio-container { font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif; }
-"""
-
-with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
-    gr.HTML("""
-    # Z-Image-Turbo (with Ultimate SD Upscale)
-    """)
-
-    with gr.Row():
-        # 左側控制欄
-        with gr.Column():
-            positive = gr.Textbox(DEFAULT_POSITIVE, label="Positive Prompt", lines=5)
-
-            # 第一列：尺寸、種子、步數
-            with gr.Row():
-                aspect = gr.Dropdown(ASPECTS, value="864x1152 (3:4)", label="Aspect Ratio")
-                seed = gr.Number(value=0, label="Seed (0 = random)", precision=0)
-                steps = gr.Slider(4, 25, value=9, step=1, label="Steps")
+            "upscale_model_name": upscale_model_name,
             
-            # 第二列：Batch Size 與 Upscale Model
-            with gr.Row():
-                batch_size_input = gr.Slider(1, 6, value=1, step=1, label="Batch Size")
-                upscale_dropdown = gr.Dropdown(
-                    choices=upscaler_list,
-                    value="None",
-                    label="Upscale Model",
-                    info="Files in models/upscale_models/. Using USDU (2x upscale, 0.35 denoise)."
-                )
-
-            # Generate 按鈕
-            with gr.Row():
-                run = gr.Button('Generate', variant='primary')
-            
-            # 進階設定
-            with gr.Accordion('Image Settings', open=False):
-                with gr.Row():
-                    cfg = gr.Slider(0.5, 4.0, value=1.0, step=0.1, label="CFG")
-                    denoise = gr.Slider(0.1, 1.0, value=1.0, step=0.05, label="Initial Denoise")
-                
-                with gr.Row():
-                    negative = gr.Textbox(DEFAULT_NEGATIVE, label="Negative Prompt", lines=3)
-        
-        # 右側顯示欄
-        with gr.Column():
-            download_image = gr.File(label="Download Image(s)")
-            
-            output_img = gr.Gallery(
-                label="Generated Images", 
-                show_label=True, 
-                elem_id="gallery", 
-                columns=2, 
-                rows=2, 
-                height=600,
-                object_fit="contain"
-            )
-            
-            used_seed = gr.Textbox(label="Seed Used", interactive=False, show_copy_button=True)
-
-    # 事件綁定
-    run.click(
-        fn=generate_ui,
-        inputs=[positive, negative, aspect, seed, steps, cfg, denoise, batch_size_input, upscale_dropdown], 
-        outputs=[download_image, output_img, used_seed]
-    )
-
-demo.launch(share=True, debug=True)
+            # USDU Params Packing
+            "usdu_upscale_by": float(usdu_upscale_by),
+            "usdu_denoise": float(usdu_denoise),
+            "usdu_mode_type": usdu_mode_type,
+            "usdu_tile_width": int(usdu_tile_width),
+            "usdu_tile_height":
