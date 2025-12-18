@@ -242,12 +242,9 @@ def generate_ui(
     return image_paths, image_paths, seed
 
 # --- Gradio 介面定義 ---
-DEFAULT_POSITIVE = """A beautiful woman with platinum blond hair that is almost white, snowy white skin, red blush, very big plump red lips, high cheek bones and sharp features. She has almond shaped red eyes and she's holding a intricate mask.
-She's wearing white and gold royal gown with a black cloak.
-In the veins of her neck its gold."""
+DEFAULT_POSITIVE = """A beautiful woman with platinum blond hair that is almost white, snowy white skin, red blush, very big plump red lips, high cheek bones and sharp features. She has almond shaped red eyes and she's holding a intricate mask. She's wearing white and gold royal gown with a black cloak. In the veins of her neck its gold."""
 
-DEFAULT_NEGATIVE = """low quality, blurry, unnatural skin tone, bad lighting, pixelated,
-noise, oversharpen, soft focus, pixelated"""
+DEFAULT_NEGATIVE = """low quality, blurry, unnatural skin tone, bad lighting, pixelated, noise, oversharpen, soft focus, pixelated"""
 
 ASPECTS = [
     "864x1152 (3:4)", "720x1280 (9:16)", "1024x1024 (1:1)", "1152x896 (9:7)", "896x1152 (7:9)",
@@ -304,3 +301,4 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
                 with gr.Row():
                     usdu_mask_blur = gr.Slider(0, 64, value=8, step=1, label="Mask Blur")
                     usdu_tile_padding = gr.Slider(0, 512, value=32, step=8,
+
