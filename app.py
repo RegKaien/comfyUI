@@ -242,9 +242,12 @@ def generate_ui(
     return image_paths, image_paths, seed
 
 # --- Gradio 介面定義 ---
-DEFAULT_POSITIVE = """A beautiful woman with platinum blond hair that is almost white, snowy white skin, red blush, very big plump red lips, high cheek bones and sharp features. She has almond shaped red eyes and she's holding a intricate mask. She's wearing white and gold royal gown with a black cloak. In the veins of her neck its gold."""
+DEFAULT_POSITIVE = """A beautiful woman with platinum blond hair that is almost white, snowy white skin, red blush, very big plump red lips, high cheek bones and sharp features. She has almond shaped red eyes and she's holding a intricate mask.
+She's wearing white and gold royal gown with a black cloak.
+In the veins of her neck its gold."""
 
-DEFAULT_NEGATIVE = """low quality, blurry, unnatural skin tone, bad lighting, pixelated, noise, oversharpen, soft focus, pixelated"""
+DEFAULT_NEGATIVE = """low quality, blurry, unnatural skin tone, bad lighting, pixelated,
+noise, oversharpen, soft focus, pixelated"""
 
 ASPECTS = [
     "864x1152 (3:4)", "720x1280 (9:16)", "1024x1024 (1:1)", "1152x896 (9:7)", "896x1152 (7:9)",
@@ -300,5 +303,56 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
 
                 with gr.Row():
                     usdu_mask_blur = gr.Slider(0, 64, value=8, step=1, label="Mask Blur")
-                    usdu_tile_padding = gr.Slider(0, 512, value=32, step=8,
+                    usdu_tile_padding = gr.Slider(0, 512, value=32, step=8, label="Tile Padding")
+                
+                with gr.Row():
+                    usdu_seam_fix_mode = gr.Dropdown(choices=["None", "Band Pass", "Half Tile", "Half Tile + Intersections"], value="None", label="Seam Fix Mode")
+                    usdu_seam_fix_denoise = gr.Slider(0.0, 1.0, value=1.0, step=0.01, label="Seam Fix Denoise")
+                
+                with gr.Row():
+                    usdu_seam_fix_width = gr.Slider(0, 512, value=64, step=8, label="Seam Fix Width")
+                    usdu_seam_fix_mask_blur = gr.Slider(0, 64, value=8, step=1, label="Seam Fix Mask Blur")
+                    usdu_seam_fix_padding = gr.Slider(0, 512, value=16, step=8, label="Seam Fix Padding")
 
+                with gr.Row():
+                    usdu_force_uniform_tiles = gr.Checkbox(value=True, label="Force Uniform Tiles")
+                    usdu_tiled_decode = gr.Checkbox(value=False, label="Tiled Decode")
+
+            with gr.Row():
+                negative = gr.Textbox(DEFAULT_NEGATIVE, label="Negative Prompt", lines=3)
+            
+            # Generate 按鈕
+            with gr.Row():
+                run = gr.Button('Generate', variant='primary')
+
+        # 右側顯示欄
+        with gr.Column():
+            download_image = gr.File(label="Download Image(s)")
+            
+            output_img = gr.Gallery(
+                label="Generated Images", 
+                show_label=True, 
+                elem_id="gallery", 
+                columns=2, 
+                rows=2, 
+                height=600,
+                object_fit="contain"
+            )
+            
+            used_seed = gr.Textbox(label="Seed Used", interactive=False, show_copy_button=True)
+
+    # 事件綁定
+    run.click(
+        fn=generate_ui,
+        inputs=[
+            positive, negative, aspect, seed, steps, cfg, denoise, batch_size_input, upscale_dropdown,
+            # USDU Params
+            usdu_upscale_by, usdu_denoise, usdu_mode_type, usdu_tile_width, usdu_tile_height,
+            usdu_mask_blur, usdu_tile_padding, usdu_seam_fix_mode, usdu_seam_fix_denoise,
+            usdu_seam_fix_width, usdu_seam_fix_mask_blur, usdu_seam_fix_padding,
+            usdu_force_uniform_tiles, usdu_tiled_decode
+        ], 
+        outputs=[download_image, output_img, used_seed]
+    )
+
+demo.launch(share=True, debug=True)
