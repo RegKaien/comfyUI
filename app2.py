@@ -309,7 +309,8 @@ ASPECTS = [
 
 custom_css = ".gradio-container { font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif; }"
 
-with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
+# 修正部分：移除 gr.Blocks 中的 theme 和 css 參數
+with gr.Blocks() as demo:
     gr.HTML("""
     <div style="width:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; margin:20px 0;">
         <h1 style="font-size:2.5em; margin-bottom:10px;">Z-Image-Turbo + Ultimate SD Upscale</h1>
@@ -370,4 +371,10 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
         outputs=[download_image, output_img, used_seed]
     )
 
-demo.launch(share=True, debug=True)
+# 修正部分：將 theme 和 css 移至 launch() 中
+demo.launch(
+    share=True, 
+    debug=True,
+    theme=gr.themes.Soft(), 
+    css=custom_css
+)
