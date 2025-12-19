@@ -192,12 +192,15 @@ def generate(input_data):
         random.seed(int(time.time()))
         seed = random.randint(0, 18446744073709551615)
 
-    print(f"🚀 Generating image with seed: {seed}")
+    print(f"🚀 Generating {batch_size} image(s) with seed: {seed}")
 
     # 1. 基礎生成
     positive = CLIPTextEncode.encode(clip, positive_prompt)[0]
     negative = CLIPTextEncode.encode(clip, negative_prompt)[0]
+    
+    # 這裡確保生成 batch_size 張 latent
     latent_image = EmptyLatentImage.generate(width, height, batch_size=batch_size)[0]
+    
     samples = KSampler.sample(unet, seed, steps, cfg, sampler_name, scheduler, positive, negative, latent_image, denoise=denoise)[0]
     decoded = VAEDecode.decode(vae, samples)[0].detach()
 
@@ -212,6 +215,7 @@ def generate(input_data):
             try:
                 upscale_model = UpscaleModelLoader.load_model(upscale_model_name)[0]
                 
+                # USDU 支援 batch 處理，回傳的也是 Tensor [B, H, W, C]
                 upscaled_result = UltimateSDUpscale.upscale(
                     image=decoded,
                     model=unet,
@@ -246,9 +250,17 @@ def generate(input_data):
                 import traceback
                 traceback.print_exc()
 
-    save_path = get_save_path(positive_prompt)
-    Image.fromarray(np.array(final_image * 255, dtype=np.uint8)[0]).save(save_path)
-    return save_path, seed
+    # 3. 儲存所有生成的圖片
+    saved_paths = []
+    # final_image 形狀為 [Batch, Height, Width, Channels]
+    for i in range(len(final_image)):
+        save_path = get_save_path(positive_prompt, suffix=f"_{i}")
+        # 將 Tensor 轉為 numpy 再轉 Image
+        img_array = np.array(final_image[i].cpu() * 255, dtype=np.uint8)
+        Image.fromarray(img_array).save(save_path)
+        saved_paths.append(save_path)
+
+    return saved_paths, seed
 
 # ==========================================
 # 5. Gradio UI
@@ -257,9 +269,10 @@ import gradio as gr
 
 def generate_ui(
     positive_prompt, negative_prompt, aspect_ratio, seed, steps, cfg, denoise,
+    batch_size, # 接收 batch_size
     upscale_model_name, upscale_by, usdu_denoise, usdu_steps, usdu_cfg,
     mode_type, tile_width, tile_height, seam_fix_mode, seam_fix_denoise, seam_fix_width,
-    batch_size=1, sampler_name="euler", scheduler="simple"
+    sampler_name="euler", scheduler="simple"
 ):
     width, height = [int(x) for x in aspect_ratio.split("(")[0].strip().split("x")]
 
@@ -289,30 +302,37 @@ def generate_ui(
             "seam_fix_width": int(seam_fix_width),
         }
     }
-    image_path, used_seed = generate(input_data)
-    return image_path, image_path, used_seed
+    
+    # generate 回傳的是路徑列表 [path1, path2, ...]
+    image_paths, used_seed = generate(input_data)
+    
+    # 回傳給 下載元件(File) 和 畫廊元件(Gallery) 都是路徑列表
+    return image_paths, image_paths, used_seed
 
-DEFAULT_POSITIVE = """A beautiful woman with platinum blond hair that is almost white, snowy white skin, red bush, very big plump red lips, high cheek bones and sharp. She has almond shaped red eyes and she's holding a intricate mask. She's wearing white and gold royal gown with a black cloak.
+DEFAULT_POSITIVE = """A beautiful woman with platinum blond hair that is almost white, snowy white skin, red bush, very big plump red lips, high cheek bones and sharp.
+She has almond shaped red eyes and she's holding a intricate mask.
+She's wearing white and gold royal gown with a black cloak.
 In the veins of her neck its gold."""
 
-DEFAULT_NEGATIVE = """low quality, blurry, unnatural skin tone, bad lighting, pixelated, noise, oversharpen, soft focus,pixelated"""
+DEFAULT_NEGATIVE = """low quality, blurry, unnatural skin tone, bad lighting, pixelated,
+noise, oversharpen, soft focus,pixelated"""
 
 ASPECTS = [
-    "864x1152 (3:4)", "720x1280 (9:16)", "1024x1024 (1:1)", "1152x896 (9:7)", "896x1152 (7:9)",
-    "1152x864 (4:3)", "1248x832 (3:2)",
-    "832x1248 (2:3)", "1280x720 (16:9)", 
+    "1024x1024 (1:1)", "1152x896 (9:7)", "896x1152 (7:9)",
+    "1152x864 (4:3)", "864x1152 (3:4)", "1248x832 (3:2)",
+    "832x1248 (2:3)", "1280x720 (16:9)", "720x1280 (9:16)",
     "1344x576 (21:9)", "576x1344 (9:21)"
 ]
 
 custom_css = ".gradio-container { font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif; }"
 
-# 修正部分：移除 gr.Blocks 中的 theme 和 css 參數
+# 使用 gr.Blocks 時不傳入 theme 與 css，改在 launch 傳入
 with gr.Blocks() as demo:
     gr.HTML("""
     <div style="width:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; margin:20px 0;">
         <h1 style="font-size:2.5em; margin-bottom:10px;">Z-Image-Turbo + Ultimate SD Upscale</h1>
         <a href="https://github.com/Tongyi-MAI/Z-Image" target="_blank">
-            
+            <img src="https://img.shields.io/badge/GitHub-Z--Image-181717?logo=github&logoColor=white" style="height:15px;">
         </a>
     </div>
     """)
@@ -321,9 +341,14 @@ with gr.Blocks() as demo:
         with gr.Column():
             positive = gr.Textbox(DEFAULT_POSITIVE, label="Positive Prompt", lines=5)
             with gr.Row():
-                aspect = gr.Dropdown(ASPECTS, value="864x1152 (3:4)", label="Aspect Ratio")
+                aspect = gr.Dropdown(ASPECTS, value="1024x1024 (1:1)", label="Aspect Ratio")
+                # 新增 Batch Size 控制項
+                batch_size = gr.Slider(1, 4, value=1, step=1, label="Batch Size")
+            
+            with gr.Row():
                 seed = gr.Number(value=0, label="Seed (0 = random)", precision=0)
-                steps = gr.Slider(4, 25, value=10, step=1, label="Steps")
+                steps = gr.Slider(4, 25, value=9, step=1, label="Steps")
+            
             with gr.Row():
                 run = gr.Button('🚀 Generate', variant='primary')
             
@@ -354,21 +379,23 @@ with gr.Blocks() as demo:
                         seam_fix_width = gr.Number(value=64, label="Seam Fix Width", precision=0)
 
         with gr.Column():
-            download_image = gr.File(label="Download Image")
-            output_img = gr.Image(label="Generated Image", height=480)
+            # 下載元件，支援 list
+            download_image = gr.File(label="Download Images")
+            # 畫廊元件，支援顯示多張圖
+            output_img = gr.Gallery(label="Generated Images", columns=2, height=480, object_fit="contain")
             used_seed = gr.Textbox(label="Seed Used", interactive=False, show_copy_button=True)
 
     run.click(
         fn=generate_ui,
         inputs=[
             positive, negative, aspect, seed, steps, cfg, denoise,
+            batch_size, # 加入 batch_size 到 inputs
             upscale_model_name, upscale_by, usdu_denoise, usdu_steps, usdu_cfg,
             mode_type, tile_width, tile_height, seam_fix_mode, seam_fix_denoise, seam_fix_width
         ],
         outputs=[download_image, output_img, used_seed]
     )
 
-# 修正部分：將 theme 和 css 移至 launch() 中
 demo.launch(
     share=True, 
     debug=True,
