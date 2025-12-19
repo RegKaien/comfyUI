@@ -1,18 +1,80 @@
 #@title Utils Code
 # %cd /content/ComfyUI
 
-import os, random, time, sys, importlib
-
-import torch
+import os
+import random
+import time
+import sys
+import importlib.util
+import subprocess
+import re
+import uuid
 import numpy as np
+import torch
 from PIL import Image
-import re, uuid
-from nodes import NODE_CLASS_MAPPINGS
+
+# 確保路徑包含 ComfyUI 根目錄
+sys.path.append(os.getcwd())
+
 import nodes
+from nodes import NODE_CLASS_MAPPINGS
+
+# ==========================================
+# 0. 輔助函式：自動安裝與載入插件
+# ==========================================
+def ensure_custom_node_installed(repo_url, folder_name):
+    """檢查並安裝 Custom Node"""
+    custom_nodes_path = os.path.join(os.getcwd(), "custom_nodes")
+    target_path = os.path.join(custom_nodes_path, folder_name)
+    
+    if not os.path.exists(target_path):
+        print(f"📦 Installing {folder_name}...")
+        try:
+            subprocess.run(["git", "clone", repo_url, "--recursive", target_path], check=True)
+            print(f"✅ Installed {folder_name}")
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Failed to install {folder_name}: {e}")
+    else:
+        print(f"ℹ️ {folder_name} already installed.")
+
+    return target_path
+
+def load_custom_node_class(node_name, folder_path):
+    """從指定資料夾動態載入節點類別"""
+    init_path = os.path.join(folder_path, "__init__.py")
+    if not os.path.exists(init_path):
+        print(f"⚠️ __init__.py not found in {folder_path}")
+        return None
+        
+    try:
+        module_name = os.path.basename(folder_path)
+        spec = importlib.util.spec_from_file_location(module_name, init_path)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
+        
+        # 檢查該模組是否有 NODE_CLASS_MAPPINGS
+        if hasattr(module, "NODE_CLASS_MAPPINGS"):
+            mappings = module.NODE_CLASS_MAPPINGS
+            if node_name in mappings:
+                print(f"✅ Successfully loaded Node: {node_name}")
+                return mappings[node_name]
+            else:
+                print(f"⚠️ Node {node_name} not found in mappings. Available: {list(mappings.keys())}")
+        else:
+            print(f"⚠️ No NODE_CLASS_MAPPINGS found in {module_name}")
+            
+    except Exception as e:
+        print(f"❌ Error loading module {folder_path}: {e}")
+        import traceback
+        traceback.print_exc()
+        
+    return None
 
 # ==========================================
 # 1. 載入標準節點 (Standard Nodes)
 # ==========================================
+print("🔄 Loading Standard Nodes...")
 UNETLoader = NODE_CLASS_MAPPINGS["UNETLoader"]()
 CLIPLoader = NODE_CLASS_MAPPINGS["CLIPLoader"]()
 VAELoader = NODE_CLASS_MAPPINGS["VAELoader"]()
@@ -22,70 +84,40 @@ VAEDecode = NODE_CLASS_MAPPINGS["VAEDecode"]()
 EmptyLatentImage = NODE_CLASS_MAPPINGS["EmptyLatentImage"]()
 
 # ==========================================
-# 2. 載入 UpscaleModelLoader (來自 comfy_extras)
+# 2. 載入 UpscaleModelLoader
 # ==========================================
+print("🔄 Loading UpscaleModelLoader...")
+UpscaleModelLoader = None
 try:
-    from comfy_extras.nodes_upscale_model import UpscaleModelLoader
-    UpscaleModelLoader = UpscaleModelLoader()
+    # 優先嘗試從 comfy_extras 導入
+    from comfy_extras.nodes_upscale_model import UpscaleModelLoader as UpscaleModelLoaderClass
+    UpscaleModelLoader = UpscaleModelLoaderClass()
+    print("✅ Loaded UpscaleModelLoader from comfy_extras")
 except ImportError:
-    print("⚠️ Warning: Could not import UpscaleModelLoader from comfy_extras.")
-    # 嘗試從 mappings 找 (fallback)
     if "UpscaleModelLoader" in NODE_CLASS_MAPPINGS:
         UpscaleModelLoader = NODE_CLASS_MAPPINGS["UpscaleModelLoader"]()
+        print("✅ Loaded UpscaleModelLoader from NODE_CLASS_MAPPINGS")
     else:
-        UpscaleModelLoader = None
+        print("❌ UpscaleModelLoader NOT found. Upscaling will fail.")
 
 # ==========================================
-# 3. 載入 UltimateSDUpscale (Custom Node)
+# 3. 安裝並載入 UltimateSDUpscale
 # ==========================================
+print("🔄 Checking UltimateSDUpscale...")
+usdu_folder = "ComfyUI_UltimateSDUpscale"
+usdu_path = ensure_custom_node_installed("https://github.com/ssitu/ComfyUI_UltimateSDUpscale", usdu_folder)
+
 UltimateSDUpscale = None
-
-def load_custom_node_by_name(target_node_name, folder_hint="UltimateSDUpscale"):
-    """嘗試從 custom_nodes 資料夾載入指定的插件"""
-    custom_nodes_path = os.path.join(os.getcwd(), "custom_nodes")
-    if not os.path.exists(custom_nodes_path):
-        return None
-
-    # 1. 先檢查 NODE_CLASS_MAPPINGS 是否已經有了
-    if target_node_name in NODE_CLASS_MAPPINGS:
-        return NODE_CLASS_MAPPINGS[target_node_name]
-
-    # 2. 搜尋符合 hint 的資料夾並嘗試執行 __init__.py
-    for item in os.listdir(custom_nodes_path):
-        if folder_hint.lower() in item.lower() and os.path.isdir(os.path.join(custom_nodes_path, item)):
-            node_path = os.path.join(custom_nodes_path, item)
-            init_file = os.path.join(node_path, "__init__.py")
-            if os.path.exists(init_file):
-                try:
-                    # 動態導入模組
-                    spec = importlib.util.spec_from_file_location(item, init_file)
-                    module = importlib.util.module_from_spec(spec)
-                    sys.modules[item] = module
-                    spec.loader.exec_module(module)
-                    
-                    # 更新 MAPPINGS
-                    if hasattr(module, "NODE_CLASS_MAPPINGS"):
-                        NODE_CLASS_MAPPINGS.update(module.NODE_CLASS_MAPPINGS)
-                        if target_node_name in NODE_CLASS_MAPPINGS:
-                            print(f"✅ Successfully loaded custom node: {item}")
-                            return NODE_CLASS_MAPPINGS[target_node_name]
-                except Exception as e:
-                    print(f"❌ Error loading custom node {item}: {e}")
-    return None
-
-# 嘗試載入 UltimateSDUpscale
-USDU_Class = load_custom_node_by_name("UltimateSDUpscale", folder_hint="Ultimate")
+USDU_Class = load_custom_node_class("UltimateSDUpscale", usdu_path)
 if USDU_Class:
     UltimateSDUpscale = USDU_Class()
 else:
-    print("⚠️ Warning: UltimateSDUpscale node NOT found. Upscaling functions will be disabled.")
+    print("⚠️ Warning: UltimateSDUpscale node could not be loaded. Upscaling functions will be disabled.")
 
 
 # ==========================================
-# 4. 模型與參數設定
+# 4. 模型載入與參數設定
 # ==========================================
-
-# 預設 Upscale 模型列表 (請確保 models/upscale_models 路徑下有這些檔案)
 UPSCALE_MODELS = [
     "None", 
     "4x-UltraSharp.pth", 
@@ -97,13 +129,15 @@ UPSCALE_MODELS = [
 USDU_MODES = ["Linear", "Chess", "None"]
 SEAM_FIX_MODES = ["None", "Band Pass", "Half Tile", "Half Tile + Intersections"]
 
+print("🔄 Loading Checkpoints...")
 with torch.inference_mode():
     try:
+        # 請根據您的實際檔名修改
         unet = UNETLoader.load_unet("z-image-turbo-fp8-e4m3fn.safetensors", "fp8_e4m3fn_fast")[0]
         clip = CLIPLoader.load_clip("qwen_3_4b.safetensors", type="lumina2")[0]
         vae = VAELoader.load_vae("ae.safetensors")[0]
     except Exception as e:
-        print(f"Error loading models: {e}")
+        print(f"❌ Error loading models: {e}")
         print("Please ensure checkpoints are in 'models/checkpoints', 'models/clip', 'models/vae'")
 
 save_dir="./results"
@@ -138,10 +172,8 @@ def generate(input_data):
     usdu_denoise = values.get('usdu_denoise', 0.2)
     usdu_steps = values.get('usdu_steps', 20)
     usdu_cfg = values.get('usdu_cfg', 8.0)
-    # 這裡預設使用與 base generation 相同的 sampler/scheduler，或者 UI 傳入
-    usdu_sampler = values.get('sampler_name', "euler") 
+    usdu_sampler = values.get('sampler_name', "euler")
     usdu_scheduler = values.get('scheduler', "normal")
-    
     mode_type = values.get('mode_type', "Linear")
     tile_width = values.get('tile_width', 512)
     tile_height = values.get('tile_height', 512)
@@ -153,7 +185,6 @@ def generate(input_data):
     seam_fix_mask_blur = values.get('seam_fix_mask_blur', 8)
     seam_fix_padding = values.get('seam_fix_padding', 16)
     
-    # 修正部分 boolean 參數，Gradio 可能傳回字串
     force_uniform_tiles = True
     tiled_decode = False
 
@@ -161,30 +192,26 @@ def generate(input_data):
         random.seed(int(time.time()))
         seed = random.randint(0, 18446744073709551615)
 
-    print(f"Generating image with seed: {seed}")
+    print(f"🚀 Generating image with seed: {seed}")
 
-    # 1. 基礎生成 (Base Generation)
+    # 1. 基礎生成
     positive = CLIPTextEncode.encode(clip, positive_prompt)[0]
     negative = CLIPTextEncode.encode(clip, negative_prompt)[0]
     latent_image = EmptyLatentImage.generate(width, height, batch_size=batch_size)[0]
     samples = KSampler.sample(unet, seed, steps, cfg, sampler_name, scheduler, positive, negative, latent_image, denoise=denoise)[0]
-    decoded = VAEDecode.decode(vae, samples)[0].detach() # Tensor [B, H, W, C]
+    decoded = VAEDecode.decode(vae, samples)[0].detach()
 
     final_image = decoded
 
-    # 2. Ultimate SD Upscale 流程
-    # 只有當 UpscaleModelLoader 和 UltimateSDUpscale 都成功載入，且用戶選擇了模型時才執行
+    # 2. Ultimate SD Upscale
     if upscale_model_name != "None" and upscale_by > 1.0:
         if UpscaleModelLoader is None or UltimateSDUpscale is None:
-            print("❌ Skipping Upscale: UpscaleModelLoader or UltimateSDUpscale node is missing.")
+            print("❌ Skipping Upscale: Node missing (Loader or USDU).")
         else:
-            print(f"🔄 Starting Ultimate SD Upscale ({upscale_by}x) with model: {upscale_model_name}...")
+            print(f"🔄 Starting Ultimate SD Upscale ({upscale_by}x) with {upscale_model_name}...")
             try:
-                # 載入 Upscale Model
-                # UpscaleModelLoader.load_model 返回 (model, )
                 upscale_model = UpscaleModelLoader.load_model(upscale_model_name)[0]
                 
-                # 執行 Upscale
                 upscaled_result = UltimateSDUpscale.upscale(
                     image=decoded,
                     model=unet,
@@ -229,28 +256,10 @@ def generate(input_data):
 import gradio as gr
 
 def generate_ui(
-    positive_prompt,
-    negative_prompt,
-    aspect_ratio,
-    seed,
-    steps,
-    cfg,
-    denoise,
-    # Upscale UI 參數
-    upscale_model_name,
-    upscale_by,
-    usdu_denoise,
-    usdu_steps,
-    usdu_cfg,
-    mode_type,
-    tile_width,
-    tile_height,
-    seam_fix_mode,
-    seam_fix_denoise,
-    seam_fix_width,
-    batch_size=1,
-    sampler_name="euler",
-    scheduler="simple"
+    positive_prompt, negative_prompt, aspect_ratio, seed, steps, cfg, denoise,
+    upscale_model_name, upscale_by, usdu_denoise, usdu_steps, usdu_cfg,
+    mode_type, tile_width, tile_height, seam_fix_mode, seam_fix_denoise, seam_fix_width,
+    batch_size=1, sampler_name="euler", scheduler="simple"
 ):
     width, height = [int(x) for x in aspect_ratio.split("(")[0].strip().split("x")]
 
@@ -267,8 +276,6 @@ def generate_ui(
             "sampler_name": sampler_name,
             "scheduler": scheduler,
             "denoise": float(denoise),
-            
-            # 傳遞 Upscale 參數
             "upscale_model_name": upscale_model_name,
             "upscale_by": float(upscale_by),
             "usdu_denoise": float(usdu_denoise),
@@ -282,7 +289,6 @@ def generate_ui(
             "seam_fix_width": int(seam_fix_width),
         }
     }
-
     image_path, used_seed = generate(input_data)
     return image_path, image_path, used_seed
 
@@ -316,12 +322,10 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
     with gr.Row():
         with gr.Column():
             positive = gr.Textbox(DEFAULT_POSITIVE, label="Positive Prompt", lines=5)
-            
             with gr.Row():
                 aspect = gr.Dropdown(ASPECTS, value="1024x1024 (1:1)", label="Aspect Ratio")
                 seed = gr.Number(value=0, label="Seed (0 = random)", precision=0)
                 steps = gr.Slider(4, 25, value=9, step=1, label="Steps")
-            
             with gr.Row():
                 run = gr.Button('🚀 Generate', variant='primary')
             
@@ -332,7 +336,6 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
                 with gr.Row():
                     negative = gr.Textbox(DEFAULT_NEGATIVE, label="Negative Prompt", lines=3)
             
-            # 新增 Ultimate SD Upscale 設定區塊
             with gr.Accordion('Ultimate SD Upscale Settings', open=True):
                 with gr.Row():
                     upscale_model_name = gr.Dropdown(choices=UPSCALE_MODELS, value="None", label="Upscale Model")
@@ -343,12 +346,10 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
                         usdu_denoise = gr.Slider(0.01, 1.0, value=0.2, step=0.01, label="USDU Denoise")
                         usdu_steps = gr.Slider(10, 100, value=20, step=1, label="USDU Steps")
                         usdu_cfg = gr.Slider(1.0, 20.0, value=8.0, step=0.5, label="USDU CFG")
-                    
                     with gr.Row():
                         mode_type = gr.Dropdown(choices=USDU_MODES, value="Linear", label="Mode Type")
                         tile_width = gr.Number(value=512, label="Tile Width", precision=0)
                         tile_height = gr.Number(value=512, label="Tile Height", precision=0)
-
                     with gr.Row():
                         seam_fix_mode = gr.Dropdown(choices=SEAM_FIX_MODES, value="None", label="Seam Fix Mode")
                         seam_fix_denoise = gr.Slider(0.0, 1.0, value=1.0, step=0.05, label="Seam Fix Denoise")
