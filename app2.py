@@ -1,15 +1,18 @@
 #@title Utils Code
 # %cd /content/ComfyUI
 
-import os, random, time
+import os, random, time, sys, importlib
 
 import torch
 import numpy as np
 from PIL import Image
 import re, uuid
 from nodes import NODE_CLASS_MAPPINGS
+import nodes
 
-# 初始化標準節點
+# ==========================================
+# 1. 載入標準節點 (Standard Nodes)
+# ==========================================
 UNETLoader = NODE_CLASS_MAPPINGS["UNETLoader"]()
 CLIPLoader = NODE_CLASS_MAPPINGS["CLIPLoader"]()
 VAELoader = NODE_CLASS_MAPPINGS["VAELoader"]()
@@ -18,11 +21,71 @@ KSampler = NODE_CLASS_MAPPINGS["KSampler"]()
 VAEDecode = NODE_CLASS_MAPPINGS["VAEDecode"]()
 EmptyLatentImage = NODE_CLASS_MAPPINGS["EmptyLatentImage"]()
 
-# 初始化 Upscale 相關節點
-UpscaleModelLoader = NODE_CLASS_MAPPINGS["UpscaleModelLoader"]()
-UltimateSDUpscale = NODE_CLASS_MAPPINGS["UltimateSDUpscale"]()
+# ==========================================
+# 2. 載入 UpscaleModelLoader (來自 comfy_extras)
+# ==========================================
+try:
+    from comfy_extras.nodes_upscale_model import UpscaleModelLoader
+    UpscaleModelLoader = UpscaleModelLoader()
+except ImportError:
+    print("⚠️ Warning: Could not import UpscaleModelLoader from comfy_extras.")
+    # 嘗試從 mappings 找 (fallback)
+    if "UpscaleModelLoader" in NODE_CLASS_MAPPINGS:
+        UpscaleModelLoader = NODE_CLASS_MAPPINGS["UpscaleModelLoader"]()
+    else:
+        UpscaleModelLoader = None
 
-# 預設 Upscale 模型列表 (請確保 models/upscale_models 路徑下有這些檔案，或根據實際情況修改)
+# ==========================================
+# 3. 載入 UltimateSDUpscale (Custom Node)
+# ==========================================
+UltimateSDUpscale = None
+
+def load_custom_node_by_name(target_node_name, folder_hint="UltimateSDUpscale"):
+    """嘗試從 custom_nodes 資料夾載入指定的插件"""
+    custom_nodes_path = os.path.join(os.getcwd(), "custom_nodes")
+    if not os.path.exists(custom_nodes_path):
+        return None
+
+    # 1. 先檢查 NODE_CLASS_MAPPINGS 是否已經有了
+    if target_node_name in NODE_CLASS_MAPPINGS:
+        return NODE_CLASS_MAPPINGS[target_node_name]
+
+    # 2. 搜尋符合 hint 的資料夾並嘗試執行 __init__.py
+    for item in os.listdir(custom_nodes_path):
+        if folder_hint.lower() in item.lower() and os.path.isdir(os.path.join(custom_nodes_path, item)):
+            node_path = os.path.join(custom_nodes_path, item)
+            init_file = os.path.join(node_path, "__init__.py")
+            if os.path.exists(init_file):
+                try:
+                    # 動態導入模組
+                    spec = importlib.util.spec_from_file_location(item, init_file)
+                    module = importlib.util.module_from_spec(spec)
+                    sys.modules[item] = module
+                    spec.loader.exec_module(module)
+                    
+                    # 更新 MAPPINGS
+                    if hasattr(module, "NODE_CLASS_MAPPINGS"):
+                        NODE_CLASS_MAPPINGS.update(module.NODE_CLASS_MAPPINGS)
+                        if target_node_name in NODE_CLASS_MAPPINGS:
+                            print(f"✅ Successfully loaded custom node: {item}")
+                            return NODE_CLASS_MAPPINGS[target_node_name]
+                except Exception as e:
+                    print(f"❌ Error loading custom node {item}: {e}")
+    return None
+
+# 嘗試載入 UltimateSDUpscale
+USDU_Class = load_custom_node_by_name("UltimateSDUpscale", folder_hint="Ultimate")
+if USDU_Class:
+    UltimateSDUpscale = USDU_Class()
+else:
+    print("⚠️ Warning: UltimateSDUpscale node NOT found. Upscaling functions will be disabled.")
+
+
+# ==========================================
+# 4. 模型與參數設定
+# ==========================================
+
+# 預設 Upscale 模型列表 (請確保 models/upscale_models 路徑下有這些檔案)
 UPSCALE_MODELS = [
     "None", 
     "4x-UltraSharp.pth", 
@@ -31,17 +94,21 @@ UPSCALE_MODELS = [
     "R-ESRGAN 4x+ Anime6B.pth"
 ]
 
-# Ultimate SD Upscale 模式列表
 USDU_MODES = ["Linear", "Chess", "None"]
 SEAM_FIX_MODES = ["None", "Band Pass", "Half Tile", "Half Tile + Intersections"]
 
 with torch.inference_mode():
-    unet = UNETLoader.load_unet("z-image-turbo-fp8-e4m3fn.safetensors", "fp8_e4m3fn_fast")[0]
-    clip = CLIPLoader.load_clip("qwen_3_4b.safetensors", type="lumina2")[0]
-    vae = VAELoader.load_vae("ae.safetensors")[0]
+    try:
+        unet = UNETLoader.load_unet("z-image-turbo-fp8-e4m3fn.safetensors", "fp8_e4m3fn_fast")[0]
+        clip = CLIPLoader.load_clip("qwen_3_4b.safetensors", type="lumina2")[0]
+        vae = VAELoader.load_vae("ae.safetensors")[0]
+    except Exception as e:
+        print(f"Error loading models: {e}")
+        print("Please ensure checkpoints are in 'models/checkpoints', 'models/clip', 'models/vae'")
 
 save_dir="./results"
 os.makedirs(save_dir, exist_ok=True)
+
 def get_save_path(prompt, suffix=""):
   save_dir = "./results"
   safe_prompt = re.sub(r'[^a-zA-Z0-9_-]', '_', prompt)[:25]
@@ -71,8 +138,10 @@ def generate(input_data):
     usdu_denoise = values.get('usdu_denoise', 0.2)
     usdu_steps = values.get('usdu_steps', 20)
     usdu_cfg = values.get('usdu_cfg', 8.0)
-    usdu_sampler = values.get('usdu_sampler', "euler")
-    usdu_scheduler = values.get('usdu_scheduler', "normal")
+    # 這裡預設使用與 base generation 相同的 sampler/scheduler，或者 UI 傳入
+    usdu_sampler = values.get('sampler_name', "euler") 
+    usdu_scheduler = values.get('scheduler', "normal")
+    
     mode_type = values.get('mode_type', "Linear")
     tile_width = values.get('tile_width', 512)
     tile_height = values.get('tile_height', 512)
@@ -83,68 +152,80 @@ def generate(input_data):
     seam_fix_width = values.get('seam_fix_width', 64)
     seam_fix_mask_blur = values.get('seam_fix_mask_blur', 8)
     seam_fix_padding = values.get('seam_fix_padding', 16)
-    force_uniform_tiles = values.get('force_uniform_tiles', True)
-    tiled_decode = values.get('tiled_decode', False)
+    
+    # 修正部分 boolean 參數，Gradio 可能傳回字串
+    force_uniform_tiles = True
+    tiled_decode = False
 
     if seed == 0:
         random.seed(int(time.time()))
         seed = random.randint(0, 18446744073709551615)
+
+    print(f"Generating image with seed: {seed}")
 
     # 1. 基礎生成 (Base Generation)
     positive = CLIPTextEncode.encode(clip, positive_prompt)[0]
     negative = CLIPTextEncode.encode(clip, negative_prompt)[0]
     latent_image = EmptyLatentImage.generate(width, height, batch_size=batch_size)[0]
     samples = KSampler.sample(unet, seed, steps, cfg, sampler_name, scheduler, positive, negative, latent_image, denoise=denoise)[0]
-    decoded = VAEDecode.decode(vae, samples)[0].detach() # 這裡是 Tensor 格式的圖像
+    decoded = VAEDecode.decode(vae, samples)[0].detach() # Tensor [B, H, W, C]
 
     final_image = decoded
 
     # 2. Ultimate SD Upscale 流程
+    # 只有當 UpscaleModelLoader 和 UltimateSDUpscale 都成功載入，且用戶選擇了模型時才執行
     if upscale_model_name != "None" and upscale_by > 1.0:
-        print(f"Starting Ultimate SD Upscale with model: {upscale_model_name}...")
-        try:
-            # 載入 Upscale Model
-            upscale_model = UpscaleModelLoader.load_model(upscale_model_name)[0]
-            
-            # 執行 Ultimate SD Upscale
-            # 注意：這裡重複使用基礎生成的 positive/negative/vae/model (unet)，這在 img2img 放大中是常見做法
-            upscaled_result = UltimateSDUpscale.upscale(
-                image=decoded,
-                model=unet,
-                positive=positive,
-                negative=negative,
-                vae=vae,
-                upscale_by=upscale_by,
-                seed=seed,
-                steps=usdu_steps,
-                cfg=usdu_cfg,
-                sampler_name=usdu_sampler,
-                scheduler=usdu_scheduler,
-                denoise=usdu_denoise,
-                upscale_model=upscale_model,
-                mode_type=mode_type,
-                tile_width=tile_width,
-                tile_height=tile_height,
-                mask_blur=mask_blur,
-                tile_padding=tile_padding,
-                seam_fix_mode=seam_fix_mode,
-                seam_fix_denoise=seam_fix_denoise,
-                seam_fix_mask_blur=seam_fix_mask_blur,
-                seam_fix_width=seam_fix_width,
-                seam_fix_padding=seam_fix_padding,
-                force_uniform_tiles=force_uniform_tiles,
-                tiled_decode=tiled_decode
-            )[0]
-            final_image = upscaled_result
-        except Exception as e:
-            print(f"Upscale failed: {e}")
+        if UpscaleModelLoader is None or UltimateSDUpscale is None:
+            print("❌ Skipping Upscale: UpscaleModelLoader or UltimateSDUpscale node is missing.")
+        else:
+            print(f"🔄 Starting Ultimate SD Upscale ({upscale_by}x) with model: {upscale_model_name}...")
+            try:
+                # 載入 Upscale Model
+                # UpscaleModelLoader.load_model 返回 (model, )
+                upscale_model = UpscaleModelLoader.load_model(upscale_model_name)[0]
+                
+                # 執行 Upscale
+                upscaled_result = UltimateSDUpscale.upscale(
+                    image=decoded,
+                    model=unet,
+                    positive=positive,
+                    negative=negative,
+                    vae=vae,
+                    upscale_by=upscale_by,
+                    seed=seed,
+                    steps=usdu_steps,
+                    cfg=usdu_cfg,
+                    sampler_name=usdu_sampler,
+                    scheduler=usdu_scheduler,
+                    denoise=usdu_denoise,
+                    upscale_model=upscale_model,
+                    mode_type=mode_type,
+                    tile_width=tile_width,
+                    tile_height=tile_height,
+                    mask_blur=mask_blur,
+                    tile_padding=tile_padding,
+                    seam_fix_mode=seam_fix_mode,
+                    seam_fix_denoise=seam_fix_denoise,
+                    seam_fix_mask_blur=seam_fix_mask_blur,
+                    seam_fix_width=seam_fix_width,
+                    seam_fix_padding=seam_fix_padding,
+                    force_uniform_tiles=force_uniform_tiles,
+                    tiled_decode=tiled_decode
+                )[0]
+                final_image = upscaled_result
+                print("✅ Upscale finished.")
+            except Exception as e:
+                print(f"❌ Upscale failed: {e}")
+                import traceback
+                traceback.print_exc()
 
     save_path = get_save_path(positive_prompt)
-    # 將 Tensor 轉換為 PIL Image 並儲存
-    # ComfyUI 的圖像 Tensor 形狀通常為 [Batch, Height, Width, Channels]
     Image.fromarray(np.array(final_image * 255, dtype=np.uint8)[0]).save(save_path)
     return save_path, seed
 
+# ==========================================
+# 5. Gradio UI
+# ==========================================
 import gradio as gr
 
 def generate_ui(
@@ -259,7 +340,7 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
                 
                 with gr.Group():
                     with gr.Row():
-                        usdu_denoise = gr.Slider(0.01, 1.0, value=0.2, step=0.01, label="USDU Denoise (Recommended: 0.1-0.3)")
+                        usdu_denoise = gr.Slider(0.01, 1.0, value=0.2, step=0.01, label="USDU Denoise")
                         usdu_steps = gr.Slider(10, 100, value=20, step=1, label="USDU Steps")
                         usdu_cfg = gr.Slider(1.0, 20.0, value=8.0, step=0.5, label="USDU CFG")
                     
