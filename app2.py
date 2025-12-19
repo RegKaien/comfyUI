@@ -292,18 +292,15 @@ def generate_ui(
     image_path, used_seed = generate(input_data)
     return image_path, image_path, used_seed
 
-DEFAULT_POSITIVE = """A beautiful woman with platinum blond hair that is almost white, snowy white skin, red bush, very big plump red lips, high cheek bones and sharp.
-She has almond shaped red eyes and she's holding a intricate mask.
-She's wearing white and gold royal gown with a black cloak.
+DEFAULT_POSITIVE = """A beautiful woman with platinum blond hair that is almost white, snowy white skin, red bush, very big plump red lips, high cheek bones and sharp. She has almond shaped red eyes and she's holding a intricate mask. She's wearing white and gold royal gown with a black cloak.
 In the veins of her neck its gold."""
 
-DEFAULT_NEGATIVE = """low quality, blurry, unnatural skin tone, bad lighting, pixelated,
-noise, oversharpen, soft focus,pixelated"""
+DEFAULT_NEGATIVE = """low quality, blurry, unnatural skin tone, bad lighting, pixelated, noise, oversharpen, soft focus,pixelated"""
 
 ASPECTS = [
-    "1024x1024 (1:1)", "1152x896 (9:7)", "896x1152 (7:9)",
-    "1152x864 (4:3)", "864x1152 (3:4)", "1248x832 (3:2)",
-    "832x1248 (2:3)", "1280x720 (16:9)", "720x1280 (9:16)",
+    "864x1152 (3:4)", "720x1280 (9:16)", "1024x1024 (1:1)", "1152x896 (9:7)", "896x1152 (7:9)",
+    "1152x864 (4:3)", "1248x832 (3:2)",
+    "832x1248 (2:3)", "1280x720 (16:9)", 
     "1344x576 (21:9)", "576x1344 (9:21)"
 ]
 
@@ -315,7 +312,7 @@ with gr.Blocks() as demo:
     <div style="width:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; margin:20px 0;">
         <h1 style="font-size:2.5em; margin-bottom:10px;">Z-Image-Turbo + Ultimate SD Upscale</h1>
         <a href="https://github.com/Tongyi-MAI/Z-Image" target="_blank">
-            <img src="https://img.shields.io/badge/GitHub-Z--Image-181717?logo=github&logoColor=white" style="height:15px;">
+            
         </a>
     </div>
     """)
@@ -324,9 +321,9 @@ with gr.Blocks() as demo:
         with gr.Column():
             positive = gr.Textbox(DEFAULT_POSITIVE, label="Positive Prompt", lines=5)
             with gr.Row():
-                aspect = gr.Dropdown(ASPECTS, value="1024x1024 (1:1)", label="Aspect Ratio")
+                aspect = gr.Dropdown(ASPECTS, value="864x1152 (3:4)", label="Aspect Ratio")
                 seed = gr.Number(value=0, label="Seed (0 = random)", precision=0)
-                steps = gr.Slider(4, 25, value=9, step=1, label="Steps")
+                steps = gr.Slider(4, 25, value=10, step=1, label="Steps")
             with gr.Row():
                 run = gr.Button('🚀 Generate', variant='primary')
             
