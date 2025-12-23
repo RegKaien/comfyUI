@@ -84,6 +84,7 @@ def generate(input):
     width = values['width']
     height = values['height']
     batch_size = values['batch_size']
+    upscale_model_name = "NMKD_2x_CX_100k.pth"
     upscale_model_name = values.get('upscale_model_name', "None") # 接收模型名稱
 
     if seed == 0:
@@ -202,7 +203,7 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
             
             # [修改] 第二列：將 Batch Size 與 Upscale Model 移至此處 (Generate 上方)
             with gr.Row():
-                batch_size_input = gr.Slider(1, 6, value=2, step=1, label="Batch Size")
+                batch_size_input = gr.Slider(1, 4, value=1, step=1, label="Batch Size")
                 upscale_dropdown = gr.Dropdown(
                     choices=upscaler_list,
                     value="None",
@@ -218,7 +219,7 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
             with gr.Accordion('Image Settings', open=False):
                 with gr.Row():
                     cfg = gr.Slider(0.5, 4.0, value=1.0, step=0.1, label="CFG")
-                    denoise = gr.Slider(0.1, 1.0, value=1.0, step=0.05, label="Denoise")
+                    denoise = gr.Slider(0.1, 1.0, value=0.85, step=0.05, label="Denoise")
                     # Batch Size 已移出
                 
                 # Upscale Model 下拉選單已移出
@@ -251,3 +252,4 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
     )
 
 demo.launch(share=True, debug=True)
+
