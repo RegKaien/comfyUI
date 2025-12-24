@@ -84,7 +84,6 @@ def generate(input):
     width = values['width']
     height = values['height']
     batch_size = values['batch_size']
-    upscale_model_name = "NMKD_2x_CX_100k.pth"
     upscale_model_name = values.get('upscale_model_name', "None") # 接收模型名稱
 
     if seed == 0:
@@ -195,6 +194,10 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
         with gr.Column():
             positive = gr.Textbox(DEFAULT_POSITIVE, label="Positive Prompt", lines=5)
 
+            # Generate 按鈕
+            with gr.Row():
+                run = gr.Button('Generate', variant='primary')
+                
             # 第一列：尺寸、種子、步數
             with gr.Row():
                 aspect = gr.Dropdown(ASPECTS, value="864x1152 (3:4)", label="Aspect Ratio")
@@ -206,15 +209,11 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
                 batch_size_input = gr.Slider(1, 4, value=1, step=1, label="Batch Size")
                 upscale_dropdown = gr.Dropdown(
                     choices=upscaler_list,
-                    value="None",
+                    value="NMKD_2x_CX_100k.pth",
                     label="Upscale Model",
                     info="Files detected in models/upscale_models/"
                 )
-
-            # Generate 按鈕
-            with gr.Row():
-                run = gr.Button('Generate', variant='primary')
-            
+           
             # 進階設定 (移除已搬走的選項)
             with gr.Accordion('Image Settings', open=False):
                 with gr.Row():
@@ -229,7 +228,7 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
         
         # 右側顯示欄
         with gr.Column():
-            download_image = gr.File(label="Download Image(s)")
+            #download_image = gr.File(label="Download Image(s)")
             
             output_img = gr.Gallery(
                 label="Generated Images", 
@@ -240,7 +239,8 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
                 height=600,
                 object_fit="contain"
             )
-            
+
+            download_image = gr.File(label="Download Image(s)")
             used_seed = gr.Textbox(label="Seed Used", interactive=False, show_copy_button=True)
 
     # 事件綁定
