@@ -206,7 +206,7 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
             
             # [修改] 第二列：將 Batch Size 與 Upscale Model 移至此處 (Generate 上方)
             with gr.Row():
-                batch_size_input = gr.Slider(1, 4, value=1, step=1, label="Batch Size")
+                batch_size_input = gr.Slider(3, 4, value=1, step=1, label="Batch Size")
                 upscale_dropdown = gr.Dropdown(
                     choices=upscaler_list,
                     value="NMKD_2x_CX_100k.pth",
@@ -252,4 +252,5 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
     )
 
 demo.launch(share=True, debug=True)
+
 
