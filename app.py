@@ -54,6 +54,7 @@ print(f"Found upscalers: {upscaler_list}")
 # --- 基礎模型預加載 ---
 print("Loading base models...")
 with torch.inference_mode():
+    # Note: "fp8_e4m3fn_fast" is aggressive. If images are broken, try changing to "default"
     unet = UNETLoader.load_unet("z-image-turbo-fp8-e4m3fn.safetensors", "fp8_e4m3fn_fast")[0]
     clip = CLIPLoader.load_clip("qwen_3_4b.safetensors", type="lumina2")[0]
     vae = VAELoader.load_vae("ae.safetensors")[0]
@@ -182,9 +183,9 @@ ASPECTS = [
 custom_css = ".gradio-container { font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif; }"
 
 # --- Gradio 介面定義 ---
-# ... (保留原本的 DEFAULT_POSITIVE, DEFAULT_NEGATIVE, ASPECTS, custom_css 定義) ...
+# FIXED: Moved theme and css to .launch() to avoid DeprecationWarning
 
-with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
+with gr.Blocks() as demo:
     gr.HTML("""
     # Z-Image-Turbo (with Upscaler)
     """)
@@ -251,7 +252,5 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
         outputs=[download_image, output_img, used_seed]
     )
 
-demo.launch(share=True, debug=True)
-
-
-
+# FIXED: theme and css passed here
+demo.launch(share=True, debug=True, theme=gr.themes.Soft(), css=custom_css)
