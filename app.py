@@ -169,10 +169,16 @@ def generate_ui(
     return image_paths, image_paths, seed
 
 # --- Gradio 介面定義 ---
-DEFAULT_POSITIVE = """A beautiful woman with platinum blond hair that is almost white, snowy white skin, red bush, very big plump red lips, high cheek bones and sharp. She has almond shaped red eyes and she's holding a intricate mask. She's wearing white and gold royal gown with a black cloak.  In the veins of her neck its gold."""
+DEFAULT_POSITIVE = """masterpiece, best quality, amazing quality, absurdres, (realistic), beautiful and aesthetic, looking at viewer, 1girl,
+A beautiful woman with dark hair, snowy white skin, red bush, very big plump red lips, high cheek bones and sharp. 
+She's wearing white and gold royal gown with a black cloak.  In the veins of her neck its gold,
+(royal palace), prestige, gorgeous, luxury, jewelry, gem, hyper-detailed, fractal art, gold complex fractal patterns, fibonacci set, PEONY, Lotus, vivid [red & white ] colors, sleek, 
+highly detailed, (36F huge breasts:1.3), off shoulders, ((stockings)), zentangle, mandala, tangle, entangle, the most beautiful form of chaos, elegant, a brutalist designed, (vivid  colors), 
+romanticism, updo, thigh highs, dynamic pose, intimidating, high cut, deep-V, huge necklace, huge earrings, ornate, huge hair accessory, """
 
 DEFAULT_NEGATIVE = """low quality, blurry, unnatural skin tone, bad lighting, pixelated,
-noise, oversharpen, soft focus,pixelated"""
+noise, oversharpen, soft focus, pixelated, (((mutation))), mutated, ((bad anatomy)), (((bad proportions))), (((disfigured))), ((deformed)), ((mutilated)), ((morbid)), ((extra limbs)), 
+(malformed limbs), ((poorly drawn hands)), (((distorted hands))), (((extra hands))), ((mutated hands)), (((fused fingers))) """
 
 ASPECTS = [
     "864x1152 (3:4)", "720x1280 (9:16)", "1024x1024 (1:1)", "1152x896 (9:7)", "896x1152 (7:9)",
@@ -254,3 +260,4 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
     )
 
 demo.launch(share=True, debug=True)
+
