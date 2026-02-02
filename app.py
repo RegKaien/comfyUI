@@ -197,7 +197,7 @@ DEFAULT_POSITIVE = """masterpiece, best quality, amazing quality, absurdres, (re
 A beautiful woman with dark hair, snowy white skin, red bush, very big plump red lips, high cheek bones and sharp., 
 She's wearing white and gold royal gown with a black cloak. In the veins of her neck its gold., 
 (royal palace), prestige, gorgeous, luxury, jewelry, gem, hyper-detailed, fractal art, gold complex fractal patterns, PEONY, vivid [red & white ] colors, sleek, 
-highly detailed, (36F huge breasts:1.3), cleavage, off shoulders, ((stockings)), gaterbelt, zentangle, mandala, tangle, entangle, the most beautiful form of chaos, elegant, a brutalist designed, (vivid  colors), 
+highly detailed, (36F huge breasts:1.3), cleavage, off shoulders, ((stockings)), garter belt, zentangle, mandala, tangle, entangle, the most beautiful form of chaos, elegant, a brutalist designed, (vivid  colors), 
 romanticism, updo, thigh highs, dynamic pose, intimidating, high cut, deep-V, huge necklace, huge earrings, ornate, huge hair accessory, looking at viewer """
 
 DEFAULT_NEGATIVE = """low quality, blurry, unnatural skin tone, bad lighting, pixelated,
@@ -287,4 +287,5 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
     )
 
 demo.launch(share=True, debug=True)
+
 
