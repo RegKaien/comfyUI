@@ -74,6 +74,10 @@ def get_save_path(prompt):
 # --- 核心生成邏輯 ---
 @torch.inference_mode()
 def generate(input):
+    # [新增] 開始計時
+    start_time = time.time()
+    upscale_duration = 0.0
+
     values = input["input"]
     positive_prompt = values['positive_prompt']
     negative_prompt = values['negative_prompt']
@@ -107,6 +111,10 @@ def generate(input):
     # --- 4. 執行 Upscale (如果使用者選的不是 None) ---
     if upscale_model_name != "None" and upscale_available:
         print(f"Upscaling with model: {upscale_model_name}...")
+        
+        # [新增] Upscale 計時開始
+        upscale_start = time.time()
+        
         try:
             # 動態加載選定的 Upscale 模型
             # 注意: load_model 通常會回傳 (model, ) tuple
@@ -118,6 +126,10 @@ def generate(input):
         except Exception as e:
             print(f"Error during upscaling: {e}")
             print("Returning original size image.")
+        
+        # [新增] Upscale 計時結束
+        upscale_end = time.time()
+        upscale_duration = upscale_end - upscale_start
 
     # 轉為可保存的格式
     decoded = decoded.detach()
@@ -129,8 +141,12 @@ def generate(input):
         save_path = get_save_path(positive_prompt)
         Image.fromarray(img_np).save(save_path)
         saved_paths.append(save_path)
+
+    # [新增] 計算總耗時
+    total_end_time = time.time()
+    total_duration = total_end_time - start_time
         
-    return saved_paths, seed
+    return saved_paths, seed, total_duration, upscale_duration
 
 # --- UI 邏輯中介 ---
 def generate_ui(
@@ -165,8 +181,16 @@ def generate_ui(
         }
     }
 
-    image_paths, seed = generate(input_data)
-    return image_paths, image_paths, seed
+    # [修改] 接收回傳的時間數據
+    image_paths, seed, total_duration, upscale_duration = generate(input_data)
+    
+    # [新增] 格式化時間訊息
+    if upscale_model_name != "None":
+        time_info = f"⏱️ Total: {total_duration:.2f}s | 🔍 Upscale: {upscale_duration:.2f}s"
+    else:
+        time_info = f"⏱️ Total: {total_duration:.2f}s | (Upscale skipped)"
+
+    return image_paths, image_paths, seed, time_info
 
 # --- Gradio 介面定義 ---
 DEFAULT_POSITIVE = """masterpiece, best quality, amazing quality, absurdres, (realistic), beautiful and aesthetic, looking at viewer, 1girl,
@@ -250,15 +274,16 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
 
             download_image = gr.File(label="Download Image(s)")
             used_seed = gr.Textbox(label="Seed Used", interactive=False, show_copy_button=True)
+            # [新增] 顯示時間資訊的元件
+            performance_info = gr.Textbox(label="Performance Stats", interactive=False)
 
     # 事件綁定
     run.click(
         fn=generate_ui,
         # inputs 列表順序必須與 generate_ui 函式參數對應
         inputs=[positive, negative, aspect, seed, steps, cfg, denoise, batch_size_input, upscale_dropdown], 
-        outputs=[download_image, output_img, used_seed]
+        # outputs 加入 performance_info
+        outputs=[download_image, output_img, used_seed, performance_info]
     )
 
 demo.launch(share=True, debug=True)
-
-
