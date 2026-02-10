@@ -193,16 +193,16 @@ def generate_ui(
     return image_paths, image_paths, seed, time_info
 
 # --- Gradio 介面定義 ---
-DEFAULT_POSITIVE = """masterpiece, best quality, amazing quality, absurdres, (realistic), beautiful and aesthetic, NSFW, 
-A beautiful woman with dark hair, snowy white skin, red bush, very big plump red lips, high cheek bones and sharp., 
-She's wearing white and gold royal gown with a black cloak. In the veins of her neck its gold., 
-(royal palace), prestige, gorgeous, luxury, jewelry, gem, hyper-detailed, fractal art, gold complex fractal patterns, PEONY, vivid [red & white ] colors, sleek, 
-highly detailed, (36F huge breasts:1.3), cleavage, off shoulders, ((stockings)), garter belt, zentangle, mandala, tangle, entangle, the most beautiful form of chaos, elegant, a brutalist designed, (vivid  colors), 
-romanticism, updo, thigh highs, dynamic pose, intimidating, high cut, deep-V, huge necklace, huge earrings, ornate, huge hair accessory, looking at viewer """
+DEFAULT_POSITIVE = """masterpiece, best quality, amazing quality, absurdres, (realistic), beautiful and aesthetic, looking at viewer, 1girl,
+A beautiful woman with dark hair, snowy white skin, red bush, very big plump red lips, high cheek bones and sharp. 
+She's wearing white and gold royal gown with a black cloak.  In the veins of her neck its gold,
+(royal palace), prestige, gorgeous, luxury, jewelry, gem, hyper-detailed, fractal art, gold complex fractal patterns, fibonacci set, PEONY, Lotus, vivid [red & white ] colors, sleek, 
+highly detailed, (36F huge breasts:1.3), off shoulders, ((stockings)), zentangle, mandala, tangle, entangle, the most beautiful form of chaos, elegant, a brutalist designed, (vivid  colors), 
+romanticism, updo, thigh highs, dynamic pose, intimidating, high cut, deep-V, huge necklace, huge earrings, ornate, huge hair accessory, """
 
 DEFAULT_NEGATIVE = """low quality, blurry, unnatural skin tone, bad lighting, pixelated,
 noise, oversharpen, soft focus, pixelated, (((mutation))), mutated, ((bad anatomy)), (((bad proportions))), (((disfigured))), ((deformed)), ((mutilated)), ((morbid)), ((extra limbs)), 
-(malformed limbs), ((poorly drawn hands)), (((distorted hands))), (((extra hands))), ((mutated hands)), (((fused fingers)))"""
+(malformed limbs), ((poorly drawn hands)), (((distorted hands))), (((extra hands))), ((mutated hands)), (((fused fingers))) """
 
 ASPECTS = [
     "864x1152 (3:4)", "720x1280 (9:16)", "1024x1024 (1:1)", "1152x896 (9:7)", "896x1152 (7:9)",
@@ -229,13 +229,7 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
             # Generate 按鈕
             with gr.Row():
                 run = gr.Button('Generate', variant='primary')
-                download_image = gr.File(label="Download Image(s)")
-            #with gr.Row():
-            # Download Image(s)
-             #   download_image = gr.File(label="Download Image(s)")
-            
-           
-            
+                
             # 第一列：尺寸、種子、步數
             with gr.Row():
                 aspect = gr.Dropdown(ASPECTS, value="864x1152 (3:4)", label="Aspect Ratio")
@@ -265,8 +259,10 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
                     negative = gr.Textbox(DEFAULT_NEGATIVE, label="Negative Prompt", lines=3)
         
         # 右側顯示欄
-            with gr.Column():
-                output_img = gr.Gallery(
+        with gr.Column():
+            #download_image = gr.File(label="Download Image(s)")
+            
+            output_img = gr.Gallery(
                 label="Generated Images", 
                 show_label=True, 
                 elem_id="gallery", 
@@ -275,12 +271,12 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
                 height=600,
                 object_fit="contain"
             )
+
             download_image = gr.File(label="Download Image(s)")
             used_seed = gr.Textbox(label="Seed Used", interactive=False, show_copy_button=True)
-        
-        # [新增] 顯示時間資訊的元件
+            # [新增] 顯示時間資訊的元件
             performance_info = gr.Textbox(label="Performance Stats", interactive=False)
-        
+
     # 事件綁定
     run.click(
         fn=generate_ui,
@@ -291,11 +287,3 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
     )
 
 demo.launch(share=True, debug=True)
-
-
-
-
-
-
-
-
