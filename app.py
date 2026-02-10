@@ -229,9 +229,7 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
             # Generate 按鈕
             with gr.Row():
                 run = gr.Button('Generate', variant='primary')
-
-                    
-            #download_image = gr.File(label="Download Image(s)")
+                download_image = gr.File(label="Download Image(s)")
             #with gr.Row():
             # Download Image(s)
              #   download_image = gr.File(label="Download Image(s)")
@@ -292,6 +290,7 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
     )
 
 demo.launch(share=True, debug=True)
+
 
 
 
