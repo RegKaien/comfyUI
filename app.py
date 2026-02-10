@@ -229,7 +229,24 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
             # Generate 按鈕
             with gr.Row():
                 run = gr.Button('Generate', variant='primary')
-                
+
+                    with gr.Column():
+            #download_image = gr.File(label="Download Image(s)")
+            
+            output_img = gr.Gallery(
+                label="Generated Images", 
+                show_label=True, 
+                elem_id="gallery", 
+                columns=2, 
+                rows=2, 
+                height=600,
+                object_fit="contain"
+            )
+            # Download Image(s)
+            download_image = gr.File(label="Download Image(s)")
+            
+
+            
             # 第一列：尺寸、種子、步數
             with gr.Row():
                 aspect = gr.Dropdown(ASPECTS, value="864x1152 (3:4)", label="Aspect Ratio")
@@ -259,24 +276,11 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
                     negative = gr.Textbox(DEFAULT_NEGATIVE, label="Negative Prompt", lines=3)
         
         # 右側顯示欄
-        with gr.Column():
-            #download_image = gr.File(label="Download Image(s)")
-            
-            output_img = gr.Gallery(
-                label="Generated Images", 
-                show_label=True, 
-                elem_id="gallery", 
-                columns=2, 
-                rows=2, 
-                height=600,
-                object_fit="contain"
-            )
-
-            download_image = gr.File(label="Download Image(s)")
             used_seed = gr.Textbox(label="Seed Used", interactive=False, show_copy_button=True)
-            # [新增] 顯示時間資訊的元件
+        
+        # [新增] 顯示時間資訊的元件
             performance_info = gr.Textbox(label="Performance Stats", interactive=False)
-
+        
     # 事件綁定
     run.click(
         fn=generate_ui,
@@ -287,5 +291,6 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
     )
 
 demo.launch(share=True, debug=True)
+
 
 
