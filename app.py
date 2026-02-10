@@ -230,22 +230,13 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
             with gr.Row():
                 run = gr.Button('Generate', variant='primary')
 
-                    with gr.Column():
+                    
             #download_image = gr.File(label="Download Image(s)")
-            
-            output_img = gr.Gallery(
-                label="Generated Images", 
-                show_label=True, 
-                elem_id="gallery", 
-                columns=2, 
-                rows=2, 
-                height=600,
-                object_fit="contain"
-            )
+            with gr.Row():
             # Download Image(s)
-            download_image = gr.File(label="Download Image(s)")
+                download_image = gr.File(label="Download Image(s)")
             
-
+            with gr.Column():
             
             # 第一列：尺寸、種子、步數
             with gr.Row():
@@ -276,6 +267,15 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
                     negative = gr.Textbox(DEFAULT_NEGATIVE, label="Negative Prompt", lines=3)
         
         # 右側顯示欄
+                output_img = gr.Gallery(
+                label="Generated Images", 
+                show_label=True, 
+                elem_id="gallery", 
+                columns=2, 
+                rows=2, 
+                height=600,
+                object_fit="contain"
+            )
             used_seed = gr.Textbox(label="Seed Used", interactive=False, show_copy_button=True)
         
         # [新增] 顯示時間資訊的元件
@@ -291,6 +291,7 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
     )
 
 demo.launch(share=True, debug=True)
+
 
 
 
