@@ -275,6 +275,7 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
                 height=600,
                 object_fit="contain"
             )
+            download_image = gr.File(label="Download Image(s)")
             used_seed = gr.Textbox(label="Seed Used", interactive=False, show_copy_button=True)
         
         # [新增] 顯示時間資訊的元件
@@ -290,6 +291,7 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
     )
 
 demo.launch(share=True, debug=True)
+
 
 
 
