@@ -236,7 +236,7 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
             # Download Image(s)
                 download_image = gr.File(label="Download Image(s)")
             
-            with gr.Column():
+           
             
             # 第一列：尺寸、種子、步數
             with gr.Row():
@@ -267,6 +267,7 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
                     negative = gr.Textbox(DEFAULT_NEGATIVE, label="Negative Prompt", lines=3)
         
         # 右側顯示欄
+            with gr.Column():
                 output_img = gr.Gallery(
                 label="Generated Images", 
                 show_label=True, 
@@ -291,6 +292,7 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
     )
 
 demo.launch(share=True, debug=True)
+
 
 
 
