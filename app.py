@@ -173,8 +173,8 @@ She's wearing white and gold royal gown with a black cloak.  In the veins of her
 highly detailed, (36F huge breasts:1.3), off shoulders, ((stockings)), zentangle, mandala, tangle, entangle, the most beautiful form of chaos, elegant, a brutalist designed, (vivid  colors), 
 romanticism, updo, thigh highs, dynamic pose, intimidating, high cut, deep-V, huge necklace, huge earrings, ornate, huge hair accessory, """
 
-DEFAULT_NEGATIVE = """low quality, blurry, unnatural skin tone, bad lighting, pixelated, ((more than two arms)), ((extra arms)), 
-noise, oversharpen, soft focus, pixelated, (((mutation))), mutated, ((bad anatomy)), (((bad proportions))), (((disfigured))), ((deformed)), ((mutilated)), ((morbid)), ((extra limbs)), 
+DEFAULT_NEGATIVE = """low quality, blurry, unnatural skin tone, bad lighting, pixelated, ((face out of frame)), ((more than two arms)), ((extra arms)), 
+noise, oversharpen, soft focus, pixelated, (((mutation))), (mutated), ((bad anatomy)), (((bad proportions))), (((disfigured))), ((deformed)), ((mutilated)), ((morbid)), ((extra limbs)), 
 (malformed limbs), ((poorly drawn hands)), (((distorted hands))), (((extra hands))), ((mutated hands)), (((fused fingers))) """
 
 ASPECTS = [
