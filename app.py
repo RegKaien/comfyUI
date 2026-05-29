@@ -170,10 +170,11 @@ DEFAULT_POSITIVE = """masterpiece, best quality, amazing quality, absurdres, (re
 A beautiful woman with dark hair, snowy white skin, red bush, very big plump red lips, high cheek bones and sharp. 
 She's wearing white and gold royal gown with a black cloak.  In the veins of her neck its gold,
 (royal palace), prestige, gorgeous, luxury, jewelry, gem, hyper-detailed, fractal art, gold complex fractal patterns, fibonacci set, PEONY, Lotus, vivid [red & white ] colors, sleek, 
-highly detailed, (36F huge breasts:1.3), off shoulders, ((stockings)), zentangle, mandala, tangle, entangle, the most beautiful form of chaos, elegant, a brutalist designed, (vivid  colors), 
-romanticism, updo, thigh highs, dynamic pose, intimidating, high cut, deep-V, huge necklace, huge earrings, ornate, huge hair accessory, """
+highly detailed, (36F huge breasts:1.3), off shoulders, 
+((stockings)), zentangle, mandala, tangle, entangle, the most beautiful form of chaos, elegant, a brutalist designed, (vivid  colors), 
+romanticism, updo, thigh highs, dynamic pose, dutch angle, dynamic angle,intimidating, high cut, deep-V, huge necklace, huge earrings, ornate, huge hair accessory, """
 
-DEFAULT_NEGATIVE = """low quality, blurry, unnatural skin tone, bad lighting, pixelated, ((face out of frame)), ((more than two arms)), ((extra arms)), 
+DEFAULT_NEGATIVE = """low quality, blurry, unnatural skin tone, bad lighting, pixelated, ((face out of frame)), ((more than two arms)), ((extra arms)),  ((more than two feet)), ((extra feet)), 
 noise, oversharpen, soft focus, pixelated, (((mutation))), (mutated), ((bad anatomy)), (((bad proportions))), (((disfigured))), ((deformed)), ((mutilated)), ((morbid)), ((extra limbs)), 
 (malformed limbs), ((poorly drawn hands)), (((distorted hands))), (((extra hands))), ((mutated hands)), (((fused fingers))) """
 
