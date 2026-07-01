@@ -187,7 +187,8 @@ ASPECTS = [
 
 custom_css = ".gradio-container { font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif; }"
 
-with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
+# 【修改處 1】：移除 theme 和 css 參數
+with gr.Blocks() as demo:
     gr.HTML("""
     # Z-Image-Turbo (with Upscaler)
     """)
@@ -242,7 +243,8 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
             )
 
             # [已移除] 原本在這裡的 download_image 
-            used_seed = gr.Textbox(label="Seed Used", interactive=False, show_copy_button=True)
+            # 【修改處 2】：移除 show_copy_button=True 參數
+            used_seed = gr.Textbox(label="Seed Used", interactive=False)
             performance_info = gr.Textbox(label="Performance Stats", interactive=False)
 
     # 事件綁定
@@ -252,4 +254,5 @@ with gr.Blocks(theme=gr.themes.Soft(), css=custom_css) as demo:
         outputs=[download_image, output_img, used_seed, performance_info]
     )
 
-demo.launch(share=True, debug=True)
+# 【修改處 3】：將 theme 和 css 參數移動到這裡
+demo.launch(share=True, debug=True, theme=gr.themes.Soft(), css=custom_css)
