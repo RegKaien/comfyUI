@@ -171,18 +171,18 @@ A beautiful woman with dark hair, snowy white skin, red bush, very big plump red
 She's wearing white and gold royal gown with a black cloak.  In the veins of her neck its gold,
 (royal palace), prestige, gorgeous, luxury, jewelry, gem, hyper-detailed, fractal art, gold complex fractal patterns, fibonacci set, PEONY, Lotus, vivid [red & white ] colors, sleek, 
 highly detailed, (36F huge breasts:1.3), off shoulders, 
-((stockings)), zentangle, mandala, tangle, entangle, the most beautiful form of chaos, elegant, a brutalist designed, (vivid  colors), 
-romanticism, updo, thigh highs, dynamic pose, dutch angle, dynamic angle,intimidating, high cut, deep-V, huge necklace, huge earrings, ornate, huge hair accessory, """
+((stockings)), zentangle, mandala, tangle, entangle, the most beautiful form of chaos, elegant, (vivid colors), 
+romanticism, updo, thigh highs, dynamic pose, dutch angle, dynamic angle, intimidating, high cut, deep-V, huge necklace, huge earrings, ornate, huge hair accessory"""
 
 DEFAULT_NEGATIVE = """low quality, blurry, unnatural skin tone, bad lighting, pixelated, ((face out of frame)), ((more than two arms)), ((extra arms)),  ((more than two feet)), ((extra feet)), 
 noise, oversharpen, soft focus, pixelated, (((mutation))), (mutated), ((bad anatomy)), (((bad proportions))), (((disfigured))), ((deformed)), ((mutilated)), ((morbid)), ((extra limbs)), 
 (malformed limbs), ((poorly drawn hands)), (((distorted hands))), (((extra hands))), ((mutated hands)), (((fused fingers))) """
 
 ASPECTS = [
-    "864x1152 (3:4)", "720x1280 (9:16)", "1024x1024 (1:1)", "1152x896 (9:7)", "896x1152 (7:9)",
+    "864x1152 (3:4)", "720x1280 (9:16)", "1024x1024 (1:1)", "576x1344 (9:21)", "1152x896 (9:7)", "896x1152 (7:9)",
     "1152x864 (4:3)", "1248x832 (3:2)",
     "832x1248 (2:3)", "1280x720 (16:9)", 
-    "1344x576 (21:9)", "576x1344 (9:21)"
+    "1344x576 (21:9)"
 ]
 
 custom_css = ".gradio-container { font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif; }"
