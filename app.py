@@ -213,7 +213,7 @@ with gr.Blocks() as demo:
             
             # 第二列：Batch Size 與 Upscale Model
             with gr.Row():
-                batch_size_input = gr.Slider(1, 4, value=1, step=1, label="Batch Size")
+                batch_size_input = gr.Slider(1, 8, value=1, step=1, label="Batch Size")
                 upscale_dropdown = gr.Dropdown(
                     choices=upscaler_list,
                     value="NMKD_2x_CX_100k.pth",
